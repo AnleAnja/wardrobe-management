@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -154,7 +155,7 @@ fun WardrobeAppContent() {
                 onNavigateToEdit = { itemId ->
                     navController.navigate("item_detail/$itemId/edit")
                 },
-                onDeleteClick = { TODO() }
+                onDeleteClick = { TODO("Logik zum Löschen hier einfügen") }
             )
         }
 
@@ -436,6 +437,41 @@ private fun ItemDetailsTopAppBar(
     uiState: ItemDetailUiState
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    var showDialog by remember { mutableStateOf(false) }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                // Schließt den Dialog, wenn außerhalb geklickt wird
+                showDialog = false
+            },
+            title = {
+                Text(text = "Bist du sicher?")
+            },
+            text = {
+                Text("Wenn du das Item löschst, kannst du es nicht wiederherstellen.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDialog = false
+                        onDeleteClick()
+                    }
+                ) {
+                    Text("Ja")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDialog = false
+                    }
+                ) {
+                    Text("Nein")
+                }
+            }
+        )
+    }
 
     TopAppBar(
         title = { Text("Item Details") },
@@ -471,7 +507,7 @@ private fun ItemDetailsTopAppBar(
                     DropdownMenuItem(
                         text = { Text("Delete") },
                         onClick = {
-                            onDeleteClick()
+                            showDialog = true
                             menuExpanded = false
                         }
                     )
@@ -609,6 +645,40 @@ fun AddItemScreen(onNavigateBack: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddItemTopAppBar(onNavigateBack: () -> Unit, uiState: AddItemUiState) {
+    var showDialog by remember { mutableStateOf(false) }
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                // Schließt den Dialog, wenn außerhalb geklickt wird
+                showDialog = false
+            },
+            title = {
+                Text(text = "Bist du sicher?")
+            },
+            text = {
+                Text("Wenn du zurückgehst, werden deine Eingaben nicht gespeichert.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDialog = false
+                        onNavigateBack() // <-- Navigation nur hier ausführen!
+                    }
+                ) {
+                    Text("Ja")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDialog = false
+                    }
+                ) {
+                    Text("Nein")
+                }
+            }
+        )
+    }
     TopAppBar(
         title = {
             Text(
@@ -617,7 +687,7 @@ fun AddItemTopAppBar(onNavigateBack: () -> Unit, uiState: AddItemUiState) {
             )
         },
         navigationIcon = {
-            IconButton(onClick = onNavigateBack) {
+            IconButton(onClick = { showDialog = true }) {
                 Icon(Icons.Default.Close, contentDescription = "Close screen")
             }
         }
