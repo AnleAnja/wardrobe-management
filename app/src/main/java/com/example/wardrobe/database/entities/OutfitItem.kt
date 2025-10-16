@@ -24,9 +24,5 @@ import androidx.room.ForeignKey
 )
 data class OutfitItem(
     @ColumnInfo(name="outfit_id") val outfitId: Int,
-    @ColumnInfo(name="item_id") val itemId: Int,
-    @ColumnInfo(name="position_x") val positionX: Float,
-    @ColumnInfo(name="position_y") val positionY: Float,
-    @ColumnInfo(name="scale") val scale: Float,
-    @ColumnInfo(name="rotation") val rotation: Float
+    @ColumnInfo(name="item_id") val itemId: Int
 )

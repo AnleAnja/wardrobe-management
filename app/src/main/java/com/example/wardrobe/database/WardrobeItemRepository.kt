@@ -12,7 +12,7 @@ class WardrobeItemRepository @Inject constructor(
         return wardrobeItemDao.getAll()
     }
 
-    fun getById(id: Int): Flow<WardrobeItem> {
+    fun getById(id: Int): Flow<WardrobeItem?> {
         return wardrobeItemDao.getById(id)
     }
 
@@ -24,7 +24,7 @@ class WardrobeItemRepository @Inject constructor(
         wardrobeItemDao.updateItem(item)
     }
 
-    suspend fun deleteItem(item: WardrobeItem) {
-        wardrobeItemDao.deleteItem(item)
+    suspend fun deleteItem(id: Int) {
+        wardrobeItemDao.deleteItem(id)
     }
 }

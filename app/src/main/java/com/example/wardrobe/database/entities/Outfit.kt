@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "outfits")
 data class Outfit(
-    @PrimaryKey val id: Int,
-    @ColumnInfo(name="image_uri") val imageUri: String?
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @ColumnInfo(name="image_uri") val imageUri: String?,
+    @ColumnInfo(name="seasons") val seasons: String? = null
 )

@@ -1,6 +1,5 @@
 package com.example.wardrobe.database.entities
 
-import android.net.Uri
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -14,5 +13,7 @@ data class WardrobeItem(
     @ColumnInfo(name="rating") val rating: Int? = null,
     @ColumnInfo(name="price") val price: Double? = null,
     @ColumnInfo(name="purchase_date") val purchaseDate: Long? = null,
-    @ColumnInfo(name="seasons") val seasons: String? = null
+    @ColumnInfo(name="seasons") val seasons: String? = null,
+    @ColumnInfo(name="times_worn") val timesWorn: Int = 0,
+    @ColumnInfo(name="last_worn") val lastWorn: Long? = null
 )
