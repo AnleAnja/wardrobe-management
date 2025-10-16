@@ -15,7 +15,7 @@ interface WardrobeItemDao {
     fun getAll(): Flow<List<WardrobeItem>>
 
     @Query("SELECT * FROM WARDROBE_ITEMS where id = :id")
-    fun getById(id: Int): Flow<WardrobeItem>
+    fun getById(id: Int): Flow<WardrobeItem?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertItem(item: WardrobeItem): Long
@@ -23,6 +23,6 @@ interface WardrobeItemDao {
     @Update(onConflict = OnConflictStrategy.REPLACE)
     suspend fun updateItem(item: WardrobeItem): Int
 
-    @Delete
-    suspend fun deleteItem(item: WardrobeItem)
+    @Query("DELETE FROM wardrobe_items WHERE id = :id")
+    suspend fun deleteItem(id: Int)
 }

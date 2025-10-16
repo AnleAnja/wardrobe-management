@@ -17,9 +17,9 @@ import androidx.room.PrimaryKey
     ]
 )
 data class ScheduledOutfit(
-    @PrimaryKey val id: Int,
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
 
     @ColumnInfo(name="outfit_id") val outfitId: Int,
     @ColumnInfo(name="date") val date: Long?,
-    @ColumnInfo(name="temperature") val temperature: Double?
+    @ColumnInfo(name="temperature") val temperature: Int?
 )
