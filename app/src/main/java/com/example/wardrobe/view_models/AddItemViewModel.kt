@@ -1,6 +1,5 @@
-package com.example.wardrobe
+package com.example.wardrobe.view_models
 
-import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

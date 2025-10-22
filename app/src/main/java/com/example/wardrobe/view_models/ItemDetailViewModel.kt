@@ -1,4 +1,4 @@
-package com.example.wardrobe
+package com.example.wardrobe.view_models
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -8,6 +8,7 @@ import com.example.wardrobe.database.entities.WardrobeItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
@@ -25,6 +26,7 @@ class ItemDetailViewModel @Inject constructor(
     private val itemId = checkNotNull(savedStateHandle.get<Int>("itemId"))
     val uiState: StateFlow<ItemDetailUiState> =
         wardrobeItemRepository.getById(itemId)
+            .filterNotNull()
             .map { item ->
                 ItemDetailUiState(isLoading = false, item = item)
             }
