@@ -19,6 +19,7 @@ data class AddItemUiState(
     val imageUri: String? = null,
     val purchaseDate: Long? = null,
     val category: String = "",
+    val subcategory: String = "",
     val rating: Int = 0,
     val price: String = "",
     val seasons: String = "",
@@ -30,7 +31,8 @@ data class AddItemUiState(
 sealed class AddItemEvent {
     data class ImageUriChanged(val uri: String?) : AddItemEvent()
     data class PurchaseDateChanged(val date: Long) : AddItemEvent()
-    data class CategoryChanged(val category: String) : AddItemEvent()
+    data class CategoryChanged(val category: String, val subcategory: String) : AddItemEvent()
+    data object ClearCategory : AddItemEvent()
     data class RatingChanged(val rating: Int) : AddItemEvent()
     data class PriceChanged(val price: String) : AddItemEvent()
     data class SeasonsChanged(val seasons: String) : AddItemEvent()
@@ -43,7 +45,6 @@ class AddItemViewModel @Inject constructor(
     private val repository: WardrobeItemRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
-    val categories = listOf("Tops", "Bottoms", "Shoes", "Accessories")
     val seasons = listOf("Spring", "Summer", "Fall", "Winter")
     private val _uiState = MutableStateFlow(AddItemUiState())
     val uiState: StateFlow<AddItemUiState> = _uiState.asStateFlow()
@@ -67,6 +68,7 @@ class AddItemViewModel @Inject constructor(
                     imageUri = it.imageUri,
                     purchaseDate = it.purchaseDate,
                     category = it.category ?: "",
+                    subcategory = it.subcategory ?: "",
                     rating = it.rating ?: 0,
                     price = it.price?.toString() ?: "",
                     seasons = it.seasons ?: ""
@@ -84,7 +86,16 @@ class AddItemViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(purchaseDate = event.date)
             }
             is AddItemEvent.CategoryChanged -> {
-                _uiState.value = _uiState.value.copy(category = event.category)
+                _uiState.value = _uiState.value.copy(
+                    category = event.category,
+                    subcategory = event.subcategory
+                )
+            }
+            is AddItemEvent.ClearCategory -> {
+                _uiState.value = _uiState.value.copy(
+                    category = "",
+                    subcategory = ""
+                )
             }
             is AddItemEvent.RatingChanged -> {
                 _uiState.value = _uiState.value.copy(rating = event.rating)
@@ -107,8 +118,7 @@ class AddItemViewModel @Inject constructor(
     private fun saveItem() {
         val state = _uiState.value
 
-        // Validation
-        if (state.category.isBlank()) {
+        if (state.category.isBlank() || state.subcategory.isBlank()) {
             _uiState.value = state.copy(errorMessage = "Category is required")
             return
         }
@@ -123,6 +133,7 @@ class AddItemViewModel @Inject constructor(
                     id = state.itemId ?: 0,
                     imageUri = state.imageUri.takeIf { it != null },
                     category = state.category,
+                    subcategory = state.subcategory,
                     rating = state.rating.takeIf { it > 0 },
                     price = price,
                     purchaseDate = state.purchaseDate,

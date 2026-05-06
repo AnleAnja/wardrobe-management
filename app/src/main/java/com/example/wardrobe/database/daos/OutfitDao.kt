@@ -13,7 +13,17 @@ interface OutfitDao {
     fun getAll(): Flow<List<Outfit>>
 
     @Query("SELECT * FROM OUTFITS where id = :id")
-    fun getById(id: Int): Flow<Outfit>
+    fun getById(id: Int): Flow<Outfit?>
+
+    @Query("SELECT * FROM outfits WHERE id IN (:outfitIds)")
+    fun getOutfitsByIds(outfitIds: List<Int>): Flow<List<Outfit>>
+
+    @Query("""
+        SELECT o.* FROM outfits o
+        INNER JOIN scheduled_outfits so ON o.id = so.outfit_id
+        WHERE so.id = :scheduledOutfitId
+    """)
+    fun getOutfitByScheduledId(scheduledOutfitId: Int): Flow<Outfit?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOutfit(outfit: Outfit): Long

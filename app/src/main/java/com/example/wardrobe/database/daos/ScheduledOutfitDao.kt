@@ -14,7 +14,7 @@ interface ScheduledOutfitDao {
     fun getAll(): Flow<List<ScheduledOutfit>>
 
     @Query("SELECT * FROM SCHEDULED_OUTFITS where id = :id")
-    fun getById(id: Int): Flow<ScheduledOutfit>
+    fun getById(id: Int): Flow<ScheduledOutfit?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOutfit(item: ScheduledOutfit): Long
@@ -24,4 +24,7 @@ interface ScheduledOutfitDao {
 
     @Query("DELETE FROM SCHEDULED_OUTFITS WHERE id = :id")
     suspend fun deleteOutfit(id: Int)
+
+    @Query("SELECT * FROM SCHEDULED_OUTFITS WHERE outfit_id = :outfitId")
+    fun getAllForOutfit(outfitId: Int): Flow<List<ScheduledOutfit>>
 }

@@ -10,6 +10,7 @@ data class WardrobeItem(
 
     @ColumnInfo(name="image_uri") val imageUri: String? = null,
     @ColumnInfo(name="category") val category: String? = null,
+    @ColumnInfo(name="subcategory") val subcategory: String? = null,
     @ColumnInfo(name="rating") val rating: Int? = null,
     @ColumnInfo(name="price") val price: Double? = null,
     @ColumnInfo(name="purchase_date") val purchaseDate: Long? = null,

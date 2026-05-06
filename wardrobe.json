@@ -1,0 +1,17 @@
+{
+  "outfitItems": [],
+  "outfits": [],
+  "scheduledOutfits": [],
+  "wardrobeItems": [
+    {
+      "category": "Bottoms",
+      "id": 1,
+      "imageUri": "content://media/picker/0/com.android.providers.media.photopicker/media/1000000019",
+      "price": 3.0,
+      "purchaseDate": 1759770402776,
+      "rating": 3,
+      "seasons": "Winter",
+      "timesWorn": 0
+    }
+  ]
+}

@@ -55,7 +55,8 @@ private fun WardrobeItemJson.toEntity() = WardrobeItem(
 
 private fun OutfitJson.toEntity() = Outfit(
     id = id,
-    imageUri = imageUri,
+    imageUriCombined = imageUriCombined,
+    imageUriTeaser = imageUriTeaser,
     seasons = seasons
 )
 

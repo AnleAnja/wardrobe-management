@@ -10,6 +10,8 @@ import com.example.wardrobe.view_models.NavigationEvent.NavigateToItemDetail
 import com.example.wardrobe.database.WardrobeItemRepository
 import com.example.wardrobe.database.entities.Outfit
 import com.example.wardrobe.database.entities.WardrobeItem
+import com.example.wardrobe.filter_sort.WardrobeFilters
+import com.example.wardrobe.filter_sort.WardrobeSortOption
 import com.example.wardrobe.json_parser.WardrobeExporter
 import com.example.wardrobe.json_parser.WardrobeImporter
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,28 +24,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-
-data class WardrobeFilters(
-    val selectedSeasons: List<String> = emptyList(),
-    val selectedCategories: List<String> = emptyList()
-)
-
-enum class WardrobeSortOption(val displayName: String) {
-    MOST_WORN("Most Worn"),
-    LEAST_WORN("Least Worn"),
-    RECENTLY_WORN("Recently Worn"),
-    LEAST_RECENTLY_WORN("Least Recently Worn"),
-    RECENTLY_PURCHASED("Recently Purchased"),
-    LEAST_RECENTLY_PURCHASED("Least Recently Purchased")
-}
-
 data class WardrobeUiState(
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
     val wardrobeItems: List<WardrobeItem> = emptyList(),
     val currentSortOption: WardrobeSortOption = WardrobeSortOption.RECENTLY_WORN,
     val currentFilters: WardrobeFilters = WardrobeFilters(),
-    val availableCategories: List<String> = listOf("Tops", "Bottoms", "Shoes", "Accessories"),
+    val availableCategories: Set<Pair<String, String>> = emptySet(),
     val availableSeasons: List<String> = listOf("Spring", "Summer", "Fall", "Winter")
 )
 
@@ -77,7 +64,13 @@ class WardrobeViewModel @Inject constructor(
             combine(allItemsFlow, _uiState) { allItems, state ->
                 val filteredItems = applyFilters(allItems, state.currentFilters)
                 val sortedItems = applySorting(filteredItems, state.currentSortOption)
-                val availableCategories = allItems.mapNotNull { it.category }.distinct().sorted()
+                val availableCategories = allItems.mapNotNull { item ->
+                    if (item.category != null && item.subcategory != null) {
+                        Pair(item.category, item.subcategory)
+                    } else {
+                        null
+                    }
+                }.toSet()
                 state.copy(
                     wardrobeItems = sortedItems,
                     availableCategories = availableCategories
@@ -112,7 +105,8 @@ class WardrobeViewModel @Inject constructor(
 
         if (filters.selectedCategories.isNotEmpty()) {
             filteredList = filteredList.filter { item ->
-                item.category != null && filters.selectedCategories.contains(item.category)
+                item.category != null && item.subcategory != null &&
+                        Pair(item.category, item.subcategory) in filters.selectedCategories
             }
         }
 
@@ -130,6 +124,7 @@ class WardrobeViewModel @Inject constructor(
             WardrobeSortOption.LEAST_RECENTLY_WORN -> items.sortedBy { it.lastWorn }
             WardrobeSortOption.RECENTLY_PURCHASED -> items.sortedByDescending { it.purchaseDate }
             WardrobeSortOption.LEAST_RECENTLY_PURCHASED -> items.sortedBy { it.purchaseDate }
+            WardrobeSortOption.HIGHEST_RATING -> items.sortedByDescending { it.rating }
             null -> items
         }
     }
@@ -194,7 +189,11 @@ class WardrobeViewModel @Inject constructor(
                 _navigationEvent.value = NavigateToItemDetail(event.item)
             }
 
-            is WardrobeScreenEvent.RefreshRequested -> {}
+            is WardrobeScreenEvent.RefreshRequested -> {
+                viewModelScope.launch {
+                    _uiState.update { it.copy(isLoading = true) }
+                }
+            }
             is WardrobeScreenEvent.ApplyFilters -> {
                 _uiState.update { it.copy(currentFilters = event.filters) }
             }
@@ -220,9 +219,7 @@ class WardrobeViewModel @Inject constructor(
         }
     }
 
-    // TODO: SortOption Typ nutzen (09.10.)
-
-    fun sortItemsBy(sortOption: String) {
+    /*fun sortItemsBy(sortOption: String) {
         val currentList = _uiState.value.wardrobeItems
         val sortedList = when (sortOption) {
             "Most Worn" -> currentList.sortedByDescending { it.timesWorn }
@@ -236,7 +233,7 @@ class WardrobeViewModel @Inject constructor(
         _uiState.update { currentState ->
             currentState.copy(wardrobeItems = sortedList)
         }
-    }
+    }*/
 }
 
 // Define sealed classes for navigation events
@@ -245,4 +242,6 @@ sealed class NavigationEvent {
     data class NavigateToItemDetail(val item: WardrobeItem) : NavigationEvent()
     data object NavigateToAddOutfit : NavigationEvent()
     data class NavigateToOutfitDetail(val outfit: Outfit) : NavigationEvent()
+    data class NavigateToScheduleOutfit(val outfit: Outfit) : NavigationEvent()
+    data object NavigateBack: NavigationEvent()
 }

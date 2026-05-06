@@ -1,6 +1,6 @@
 package com.example.wardrobe
 
-import WardrobeAppContent
+import MainAppContent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,10 +14,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             Surface(color = MaterialTheme.colorScheme.background) {
-                WardrobeAppContent()
+                MainAppContent()
             }
         }
     }
 }
-
-// TODO: Import implementieren (Format?)

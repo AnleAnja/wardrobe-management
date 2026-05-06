@@ -21,7 +21,8 @@ data class WardrobeItemJson(
 
 data class OutfitJson(
     val id: Int,
-    val imageUri: String?,
+    val imageUriCombined: String?,
+    val imageUriTeaser: String?,
     val seasons: String?
 )
 

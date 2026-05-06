@@ -16,13 +16,15 @@ import javax.inject.Inject
 data class ItemDetailUiState(
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
-    val item: WardrobeItem? = null
+    val item: WardrobeItem? = null,
+    val daysSinceLastWear: Int? = null
 )
 @HiltViewModel
 class ItemDetailViewModel @Inject constructor(
     wardrobeItemRepository: WardrobeItemRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
     private val itemId = checkNotNull(savedStateHandle.get<Int>("itemId"))
     val uiState: StateFlow<ItemDetailUiState> =
         wardrobeItemRepository.getById(itemId)

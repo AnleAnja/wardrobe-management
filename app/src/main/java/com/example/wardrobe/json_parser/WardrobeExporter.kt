@@ -4,6 +4,10 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.example.wardrobe.database.AppDatabase
+import com.example.wardrobe.database.entities.Outfit
+import com.example.wardrobe.database.entities.OutfitItem
+import com.example.wardrobe.database.entities.ScheduledOutfit
+import com.example.wardrobe.database.entities.WardrobeItem
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.flow.first
@@ -42,7 +46,7 @@ class WardrobeExporter @Inject constructor(private val database: AppDatabase) {
     }
 }
 
-private fun com.example.wardrobe.database.entities.WardrobeItem.toJson() =
+private fun WardrobeItem.toJson() =
     WardrobeItemJson(
         id = id,
         imageUri = imageUri,
@@ -55,20 +59,21 @@ private fun com.example.wardrobe.database.entities.WardrobeItem.toJson() =
         lastWorn = lastWorn
     )
 
-private fun com.example.wardrobe.database.entities.Outfit.toJson() =
+private fun Outfit.toJson() =
     OutfitJson(
         id = id,
-        imageUri = imageUri,
+        imageUriCombined = imageUriCombined,
+        imageUriTeaser = imageUriTeaser,
         seasons = seasons
     )
 
-private fun com.example.wardrobe.database.entities.OutfitItem.toJson() =
+private fun OutfitItem.toJson() =
     OutfitItemJson(
         outfitId = outfitId,
         itemId = itemId
     )
 
-private fun com.example.wardrobe.database.entities.ScheduledOutfit.toJson() =
+private fun ScheduledOutfit.toJson() =
     ScheduledOutfitJson(
         id = id,
         outfitId = outfitId,
