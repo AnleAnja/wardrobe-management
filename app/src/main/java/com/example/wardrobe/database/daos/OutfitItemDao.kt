@@ -4,6 +4,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.example.wardrobe.database.entities.Outfit
 import com.example.wardrobe.database.entities.OutfitItem
 import com.example.wardrobe.database.entities.WardrobeItem
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +23,13 @@ interface OutfitItemDao {
         WHERE oi.outfit_id = :outfitId
     """)
     fun getItemsForOutfit(outfitId: Int): Flow<List<WardrobeItem>>
+
+    @Query("""
+        SELECT o.* FROM outfits o
+        INNER JOIN outfit_items oi ON o.id = oi.outfit_id
+        WHERE oi.item_id = :itemId
+    """)
+    fun getOutfitsForItem(itemId: Int): Flow<List<Outfit>>
 
 
     @Query("DELETE FROM outfit_items WHERE outfit_id = :outfitId")

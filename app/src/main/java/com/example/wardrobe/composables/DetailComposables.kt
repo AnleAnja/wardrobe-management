@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
@@ -185,7 +186,10 @@ fun DetailsTopAppBar(
 }
 
 @Composable
-fun ItemDetailsContent(uiState: ItemDetailUiState) {
+fun ItemDetailsContent(
+    uiState: ItemDetailUiState,
+    onOutfitClick: (Int) -> Unit
+) {
     when {
         uiState.isLoading -> {
             Box(
@@ -290,6 +294,50 @@ fun ItemDetailsContent(uiState: ItemDetailUiState) {
                             SimpleDateFormat("dd MMMM yyyy", Locale.getDefault()).format(Date(it))
                         } ?: "Not set"
                         DetailRow(label = "Purchase Date", value = formattedDate)
+                    }
+                    if (uiState.outfits.isNotEmpty()) {
+                        Column {
+                            Text(
+                                "Part of Outfits",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Card(shape = RoundedCornerShape(12.dp)) {
+                                Column {
+                                    uiState.outfits.forEach { outfit ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { onOutfitClick(outfit.id) }
+                                                .padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                        ) {
+                                            AsyncImage(
+                                                model = outfit.imageUriTeaser,
+                                                contentDescription = "Outfit image",
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            )
+                                            Text(
+                                                text = "Outfit ID: ${outfit.id}",
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Filled.ChevronRight,
+                                                contentDescription = "View outfit details",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             } ?: Text("Item Details würden hier stehen...")
@@ -703,10 +751,42 @@ fun ScheduledOutfitDetailsContent(
     uiState: OutfitDetailUiState,
     onNavigateToFullOutfitDetail: (Int) -> Unit,
     onItemClick: (Int) -> Unit,
-    onNavigateToEdit: (Int) -> Unit
+    onNavigateToEdit: (Int) -> Unit,
+    onDelete: (Int) -> Unit
 ) {
     val outfit = uiState.outfit
     val scheduledOutfit = uiState.scheduledOutfit
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    if (showDeleteDialog && scheduledOutfit != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = {
+                Text(text = "Bist du sicher?")
+            },
+            text = {
+                Text("Wenn du das geplante Outfit löschst, kannst du es nicht wiederherstellen.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        onDelete(scheduledOutfit.id)
+                    }
+                ) {
+                    Text("Ja")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                    }
+                ) {
+                    Text("Nein")
+                }
+            }
+        )
+    }
     when {
         uiState.isLoading -> {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -753,6 +833,7 @@ fun ScheduledOutfitDetailsContent(
                         )
                         Spacer(Modifier.weight(1f))
                         IconButton({ onNavigateToEdit(scheduledOutfit.id) }) { Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit") }
+                        IconButton({ showDeleteDialog = true }) { Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete") }
                     }
                     Spacer(Modifier.height(16.dp))
                     Card(shape = RoundedCornerShape(12.dp)) {

@@ -38,6 +38,10 @@ class OutfitRepository @Inject constructor(
         return outfitItemDao.getItemsForOutfit(outfitId)
     }
 
+    fun getOutfitsForItem(itemId: Int): Flow<List<Outfit>> {
+        return outfitItemDao.getOutfitsForItem(itemId)
+    }
+
     suspend fun insertOutfit(outfit: Outfit): Long {
         return outfitDao.insertOutfit(outfit)
     }
@@ -77,6 +81,10 @@ class OutfitRepository @Inject constructor(
 
     suspend fun deleteOutfit(id: Int) {
         outfitDao.deleteOutfit(id)
+    }
+
+    suspend fun deleteScheduledOutfit(id: Int) {
+        scheduledOutfitDao.deleteOutfit(id)
     }
 
     suspend fun insertScheduledItem(item: ScheduledItem) {

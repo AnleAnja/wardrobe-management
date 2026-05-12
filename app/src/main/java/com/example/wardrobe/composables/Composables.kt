@@ -265,7 +265,12 @@ fun MainAppContent() {
                 val detailViewModel: ItemDetailViewModel = hiltViewModel(backStackEntry)
                 val uiState by detailViewModel.uiState.collectAsState()
 
-                ItemDetailsContent(uiState = uiState)
+                ItemDetailsContent(
+                    uiState = uiState,
+                    onOutfitClick = { outfitId ->
+                        navController.navigate(Screen.Outfits.route + "/outfit_detail/$outfitId")
+                    }
+                )
             }
 
             composable(
@@ -318,6 +323,10 @@ fun MainAppContent() {
                     },
                     onNavigateToEdit = { scheduledOutfitId ->
                         navController.navigate(Screen.Calendar.route + "/scheduled_outfit/$scheduledOutfitId/add_item")
+                    },
+                    onDelete = { scheduledOutfitId ->
+                        detailViewModel.deleteScheduledOutfit(scheduledOutfitId)
+                        navController.popBackStack()
                     }
                 )
             }

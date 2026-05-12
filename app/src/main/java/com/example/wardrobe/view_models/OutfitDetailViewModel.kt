@@ -152,4 +152,10 @@ class OutfitDetailViewModel @Inject constructor(
         }
     }
 
+    fun deleteScheduledOutfit(scheduledOutfitId: Int) {
+        viewModelScope.launch {
+            repository.deleteScheduledOutfit(scheduledOutfitId)
+        }
+    }
+
 }

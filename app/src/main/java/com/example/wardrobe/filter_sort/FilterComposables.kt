@@ -358,7 +358,7 @@ fun FilterDialog(
             TextButton(
                 onClick = {
                     onApplyFilters(localSelectedCategories.toSet(), localSelectedSeasons,
-                        localTempInput.toInt()
+                        localTempInput.toIntOrNull()
                     )
                 }
             ) {

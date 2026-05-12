@@ -142,6 +142,7 @@ class OutfitsViewModel @Inject constructor(
             OutfitSortOption.RECENTLY_WORN -> outfits.sortedByDescending { it.lastWorn }
             OutfitSortOption.LEAST_RECENTLY_WORN -> outfits.sortedBy { it.lastWorn }
             OutfitSortOption.HIGHEST_RATING -> outfits.sortedByDescending { it.rating }
+            OutfitSortOption.SEASON -> outfits.sortedBy { it.seasons ?: "" }
             null -> outfits
         }
     }

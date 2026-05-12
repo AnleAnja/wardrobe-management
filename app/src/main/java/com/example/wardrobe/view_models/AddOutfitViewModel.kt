@@ -156,7 +156,9 @@ class AddOutfitViewModel @Inject constructor(
                     _uiState.update { it.copy(isLoading = false, errorMessage = "Failed to load items: ${e.message}") }
                 }
                 .collect { items ->
-                    val groupedItems = items.groupBy { it.category ?: "Uncategorized" }
+                    val groupedItems = items
+                        .sortedBy { it.lastWorn ?: Long.MIN_VALUE }
+                        .groupBy { it.category ?: "Uncategorized" }
                     _uiState.update { it.copy(isLoading = false, itemsByCategory = groupedItems) }
                 }
         }

@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.CalendarViewWeek
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -117,6 +118,7 @@ fun CalendarContent(
     if (uiState.isOutfitSelectionDialogVisible) {
         OutfitSelectionDialog(
             outfits = allOutfits,
+            scheduledOutfits = uiState.scheduledOutfits,
             onOutfitSelected = { outfit, temperature ->
                 onEvent(CalendarEvent.ScheduleOutfitForDate(outfit, temperature))
             },
@@ -421,12 +423,28 @@ fun CalendarTopAppBar(currentView: CalendarView, title: String, onToggleView: ()
 @Composable
 fun OutfitSelectionDialog(
     outfits: List<Outfit>,
+    scheduledOutfits: List<ScheduledOutfit>,
     onOutfitSelected: (outfit: Outfit, temperature: Int?) -> Unit,
     onDismiss: () -> Unit
 ) {
 
     var selectedOutfit by remember { mutableStateOf<Outfit?>(null) }
     var temperatureInput by remember { mutableStateOf("") }
+    var filterTemperatureInput by remember { mutableStateOf("") }
+    var selectedSeasons by remember { mutableStateOf(emptySet<String>()) }
+    val seasons = listOf("Spring", "Summer", "Fall", "Winter")
+    val filterTemperature = filterTemperatureInput.toIntOrNull()
+    val filteredOutfits = outfits.filter { outfit ->
+        val outfitSeasons = outfit.seasons?.split(',')?.map { it.trim() } ?: emptyList()
+        val matchesSeason = selectedSeasons.isEmpty() || selectedSeasons.any { it in outfitSeasons }
+        val matchesTemperature = filterTemperature?.let { temp ->
+            val temps = scheduledOutfits
+                .filter { it.outfitId == outfit.id }
+                .mapNotNull { it.temperature }
+            temps.isNotEmpty() && temp in temps.minOrNull()!!..temps.maxOrNull()!!
+        } ?: true
+        matchesSeason && matchesTemperature
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -434,46 +452,76 @@ fun OutfitSelectionDialog(
             Text(if (selectedOutfit == null) "Select an Outfit" else "Enter Temperature")
         },
         text = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp)
-            ) {
+            Column {
                 AnimatedVisibility(visible = selectedOutfit == null) {
-                    if (outfits.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(vertical = 32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No outfits available. Create an outfit first!",
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(outfits, key = { it.id }) { outfit ->
-                                OutfitRow(
-                                    outfit = outfit,
-                                    isSelected = false,
-                                    onRowClick = {
-                                        selectedOutfit = it
-                                    }
+                    Column {
+                        Text("Filter", style = MaterialTheme.typography.titleMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            seasons.forEach { season ->
+                                FilterChip(
+                                    selected = season in selectedSeasons,
+                                    onClick = {
+                                        selectedSeasons = if (season in selectedSeasons) {
+                                            selectedSeasons - season
+                                        } else {
+                                            selectedSeasons + season
+                                        }
+                                    },
+                                    label = { Text(season) }
                                 )
                             }
                         }
+                        OutlinedTextField(
+                            value = filterTemperatureInput,
+                            onValueChange = {
+                                filterTemperatureInput = it.filter { char -> char.isDigit() || char == '-' }
+                            },
+                            label = { Text("Filter by temperature (°C)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
-                AnimatedVisibility(visible = selectedOutfit != null) {
-                    selectedOutfit?.let { outfit ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp)
+                ) {
+                    if (selectedOutfit == null) {
+                        if (filteredOutfits.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(vertical = 32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (outfits.isEmpty()) "No outfits available. Create an outfit first!" else "No outfits match the filters.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    textAlign = TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(filteredOutfits, key = { it.id }) { outfit ->
+                                    OutfitRow(
+                                        outfit = outfit,
+                                        isSelected = false,
+                                        onRowClick = {
+                                            selectedOutfit = it
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    } else {
                         Column(modifier = Modifier.fillMaxSize()) {
                             Text(
                                 "Selected:",

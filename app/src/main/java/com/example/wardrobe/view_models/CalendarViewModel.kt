@@ -28,6 +28,7 @@ data class CalendarUiState(
     val eventDays: Set<LocalDate> = emptySet(),
     val selectedDate: LocalDate = LocalDate.now(),
     val outfitsForSelectedDate: List<Pair<ScheduledOutfit, Outfit>> = emptyList(),
+    val scheduledOutfits: List<ScheduledOutfit> = emptyList(),
     val outfit: Outfit? = null,
     val isOutfitSelectionDialogVisible: Boolean = false
 )
@@ -73,7 +74,13 @@ class CalendarViewModel @Inject constructor(
                             .atZone(ZoneId.systemDefault()).toLocalDate()
                     }
                 }.toSet()
-                _uiState.update { it.copy(isLoading = false, eventDays = eventDaysSet) }
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        eventDays = eventDaysSet,
+                        scheduledOutfits = scheduledOutfits
+                    )
+                }
                 updateOutfitsForSelectedDate(uiState.value.selectedDate)
             }
         }
