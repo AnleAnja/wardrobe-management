@@ -26,7 +26,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "wardrobe_db"
         )
-            .fallbackToDestructiveMigration(false)
+            .fallbackToDestructiveMigration(true)
             .build()
     }
 

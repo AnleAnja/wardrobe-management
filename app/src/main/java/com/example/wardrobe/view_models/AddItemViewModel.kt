@@ -1,11 +1,15 @@
 package com.example.wardrobe.view_models
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wardrobe.database.WardrobeItemRepository
 import com.example.wardrobe.database.entities.WardrobeItem
+import com.example.wardrobe.storage.ImageStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,7 +33,8 @@ data class AddItemUiState(
 )
 
 sealed class AddItemEvent {
-    data class ImageUriChanged(val uri: String?) : AddItemEvent()
+    /** Pass a non-null Uri when the user picked an image, null when they cleared it. */
+    data class ImageUriChanged(val uri: Uri?) : AddItemEvent()
     data class PurchaseDateChanged(val date: Long) : AddItemEvent()
     data class CategoryChanged(val category: String, val subcategory: String) : AddItemEvent()
     data object ClearCategory : AddItemEvent()
@@ -43,6 +48,7 @@ sealed class AddItemEvent {
 @HiltViewModel
 class AddItemViewModel @Inject constructor(
     private val repository: WardrobeItemRepository,
+    private val imageStorage: ImageStorage,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     val seasons = listOf("Spring", "Summer", "Fall", "Winter")
@@ -50,6 +56,14 @@ class AddItemViewModel @Inject constructor(
     val uiState: StateFlow<AddItemUiState> = _uiState.asStateFlow()
 
     private val itemId: Int? = savedStateHandle.get<Int>("itemId")
+
+    // Image originally loaded from DB; only deleted once Save commits a replacement.
+    private var originalImageUri: String? = null
+
+    // Files we copied into filesDir during this editing session that haven't been
+    // committed yet. Used to clean up freshly-picked images on cancel/replace.
+    private val sessionPaths = mutableSetOf<String>()
+    private var saveCommitted = false
 
     init {
         if (itemId != null) {
@@ -63,6 +77,7 @@ class AddItemViewModel @Inject constructor(
         viewModelScope.launch {
             val item = repository.getById(id).firstOrNull()
             item?.let {
+                originalImageUri = it.imageUri
                 _uiState.value = _uiState.value.copy(
                     itemId = it.id,
                     imageUri = it.imageUri,
@@ -79,9 +94,7 @@ class AddItemViewModel @Inject constructor(
 
     fun onEvent(event: AddItemEvent) {
         when (event) {
-            is AddItemEvent.ImageUriChanged -> {
-                _uiState.value = _uiState.value.copy(imageUri = event.uri)
-            }
+            is AddItemEvent.ImageUriChanged -> handleImagePicked(event.uri)
             is AddItemEvent.PurchaseDateChanged -> {
                 _uiState.value = _uiState.value.copy(purchaseDate = event.date)
             }
@@ -115,6 +128,32 @@ class AddItemViewModel @Inject constructor(
         }
     }
 
+    private fun handleImagePicked(source: Uri?) {
+        viewModelScope.launch {
+            val current = _uiState.value.imageUri
+            if (source == null) {
+                if (current != null && current in sessionPaths) {
+                    imageStorage.deleteImage(current)
+                    sessionPaths.remove(current)
+                }
+                _uiState.update { it.copy(imageUri = null) }
+                return@launch
+            }
+            val newPath = imageStorage.saveImage(source)
+            if (newPath == null) {
+                _uiState.update { it.copy(errorMessage = "Could not save image") }
+                return@launch
+            }
+            // Replacing an uncommitted session image: drop the old copy.
+            if (current != null && current in sessionPaths) {
+                imageStorage.deleteImage(current)
+                sessionPaths.remove(current)
+            }
+            sessionPaths.add(newPath)
+            _uiState.update { it.copy(imageUri = newPath) }
+        }
+    }
+
     private fun saveItem() {
         val state = _uiState.value
 
@@ -131,7 +170,7 @@ class AddItemViewModel @Inject constructor(
 
                 val item = WardrobeItem(
                     id = state.itemId ?: 0,
-                    imageUri = state.imageUri.takeIf { it != null },
+                    imageUri = state.imageUri,
                     category = state.category,
                     subcategory = state.subcategory,
                     rating = state.rating.takeIf { it > 0 },
@@ -140,15 +179,35 @@ class AddItemViewModel @Inject constructor(
                     seasons = state.seasons.takeIf { it.isNotBlank() }
                 )
 
-                if(itemId != 0 && itemId != null) repository.updateItem(item) else repository.insertItem(item)
+                if (itemId != null && itemId != 0) repository.updateItem(item) else repository.insertItem(item)
+
+                // Save committed: if we replaced or cleared the original local image, delete it.
+                val original = originalImageUri
+                if (original != null && original != state.imageUri) {
+                    imageStorage.deleteImage(original)
+                }
+                sessionPaths.clear()
+                saveCommitted = true
 
                 _uiState.value = AddItemUiState(isSuccess = true)
-
             } catch (e: Exception) {
                 _uiState.value = state.copy(
                     isLoading = false,
                     errorMessage = "Failed to save item: ${e.message}"
                 )
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        if (saveCommitted) return
+        // User cancelled — drop any freshly-copied images that never got persisted.
+        val toClean = sessionPaths.toList()
+        sessionPaths.clear()
+        if (toClean.isNotEmpty()) {
+            CoroutineScope(Dispatchers.IO).launch {
+                toClean.forEach { imageStorage.deleteImage(it) }
             }
         }
     }

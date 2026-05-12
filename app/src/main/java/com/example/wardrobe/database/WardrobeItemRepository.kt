@@ -3,7 +3,7 @@ package com.example.wardrobe.database
 import com.example.wardrobe.database.daos.WardrobeItemDao
 import com.example.wardrobe.database.entities.WardrobeItem
 import kotlinx.coroutines.flow.Flow
-import jakarta.inject.Inject
+import javax.inject.Inject
 
 class WardrobeItemRepository @Inject constructor(
     private val wardrobeItemDao: WardrobeItemDao

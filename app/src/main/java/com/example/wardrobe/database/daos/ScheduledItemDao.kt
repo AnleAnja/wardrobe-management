@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ScheduledItemDao {
 
+    @Query("SELECT * FROM scheduled_items")
+    fun getAll(): Flow<List<ScheduledItem>>
+
     @Query("""
         SELECT w.* FROM wardrobe_items w
         INNER JOIN scheduled_items si ON w.id = si.item_id

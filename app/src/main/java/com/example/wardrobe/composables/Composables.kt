@@ -1,7 +1,6 @@
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.Uri
-import android.util.Log
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -266,7 +265,12 @@ fun MainAppContent() {
                 val detailViewModel: ItemDetailViewModel = hiltViewModel(backStackEntry)
                 val uiState by detailViewModel.uiState.collectAsState()
 
-                ItemDetailsContent(uiState = uiState)
+                ItemDetailsContent(
+                    uiState = uiState,
+                    onOutfitClick = { outfitId ->
+                        navController.navigate(Screen.Outfits.route + "/outfit_detail/$outfitId")
+                    }
+                )
             }
 
             composable(
@@ -319,6 +323,10 @@ fun MainAppContent() {
                     },
                     onNavigateToEdit = { scheduledOutfitId ->
                         navController.navigate(Screen.Calendar.route + "/scheduled_outfit/$scheduledOutfitId/add_item")
+                    },
+                    onDelete = { scheduledOutfitId ->
+                        detailViewModel.deleteScheduledOutfit(scheduledOutfitId)
+                        navController.popBackStack()
                     }
                 )
             }
@@ -410,19 +418,7 @@ fun GalleryTopAppBar(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri: Uri? ->
             uri?.let { fileUri ->
-                try {
-                    val inputStream = context.contentResolver.openInputStream(fileUri)
-                    val jsonContent = inputStream?.bufferedReader().use { reader ->
-                        reader?.readText()
-                    }
-                    if (jsonContent != null) {
-                        viewModel.onEvent(WardrobeScreenEvent.ImportJson(jsonContent))
-                    } else {
-                        Log.e("FilePicker", "Could not read file content.")
-                    }
-                } catch (e: Exception) {
-                    Log.e("FilePicker", "Error reading file", e)
-                }
+                viewModel.onEvent(WardrobeScreenEvent.ImportJson(context, fileUri))
             }
         }
     )
@@ -694,7 +690,6 @@ fun <T> GalleryCard(
             val hasPersistedPermission = persistedUris.any { it.uri == uri && it.isReadPermission }
 
             if (!hasPersistedPermission) {
-                Log.e("WardrobeItemCard", "Keine Berechtigung mehr für URI: $imageUri")
                 hasPermission = false
             }
         }
@@ -819,7 +814,18 @@ fun InspirationView(url: String, onPageFinished: () -> Unit, onPageStarted: () -
         modifier = Modifier.fillMaxSize(),
         factory = { context ->
             WebView(context).apply {
-                settings.javaScriptEnabled = true
+                with(settings) {
+                    // Pinterest needs JS, but lock down the rest of the surface area.
+                    javaScriptEnabled = true
+                    javaScriptCanOpenWindowsAutomatically = false
+                    allowFileAccess = false
+                    allowContentAccess = false
+                    @Suppress("DEPRECATION")
+                    allowFileAccessFromFileURLs = false
+                    @Suppress("DEPRECATION")
+                    allowUniversalAccessFromFileURLs = false
+                    setSafeBrowsingEnabled(true)
+                }
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
