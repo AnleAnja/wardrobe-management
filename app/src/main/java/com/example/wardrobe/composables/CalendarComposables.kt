@@ -1,6 +1,5 @@
 package com.example.wardrobe.composables
 
-import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -92,7 +91,6 @@ fun CalendarContent(
     val firstDayOfWeek = remember { firstDayOfWeekFromLocale() }
     val coroutineScope = rememberCoroutineScope()
     val isPlanningMode = uiState.outfit != null
-    Log.d("CalendarContent", "isPlanningMode: $isPlanningMode")
 
     val monthState = rememberCalendarState(
         startMonth = startMonth,

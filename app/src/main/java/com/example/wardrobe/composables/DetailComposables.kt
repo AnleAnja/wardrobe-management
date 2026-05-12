@@ -360,7 +360,7 @@ fun OutfitDetailsContent(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
-                    val imageUris = listOf(it.imageUriCombined, it.imageUriTeaser)
+                    val imageUris = listOf(it.imageUriTeaser, it.imageUriCombined)
                     val pagerState = rememberPagerState(pageCount = { imageUris.size })
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -727,41 +727,45 @@ fun ScheduledOutfitDetailsContent(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                Row {
-                    val dateAndTempString = buildString {
-                        scheduledOutfit.date?.let { dateMillis ->
-                            val date = Instant.ofEpochMilli(dateMillis)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-                            val formatter = DateTimeFormatter.ofPattern("dd/MM")
-                            append(date.format(formatter))
-                        } ?: append("No Date")
-                        scheduledOutfit.temperature?.let { temp ->
-                            append("  ($temp°C)")
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Row {
+                        val dateAndTempString = buildString {
+                            scheduledOutfit.date?.let { dateMillis ->
+                                val date = Instant.ofEpochMilli(dateMillis)
+                                    .atZone(ZoneId.systemDefault())
+                                    .toLocalDate()
+                                val formatter = DateTimeFormatter.ofPattern("dd/MM")
+                                append(date.format(formatter))
+                            } ?: append("No Date")
+                            scheduledOutfit.temperature?.let { temp ->
+                                append("  ($temp°C)")
+                            }
+                        }
+                        Text(
+                            dateAndTempString,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                        Spacer(Modifier.weight(1f))
+                        IconButton({ onNavigateToEdit(scheduledOutfit.id) }) { Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit") }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Card(shape = RoundedCornerShape(12.dp)) {
+                        Column {
+                            uiState.itemsInOutfit.forEach { item ->
+                                OutfitItemRow(
+                                    item = item,
+                                    onClick = { onItemClick(item.id) }
+                                )
+                            }
                         }
                     }
-                    Text(
-                        dateAndTempString,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-                    Spacer(Modifier.weight(1f))
-                    IconButton({ onNavigateToEdit(scheduledOutfit.id) }) { Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit") }
                 }
-                Spacer(Modifier.height(16.dp))
-                Card(shape = RoundedCornerShape(12.dp)) {
-                    Column {
-                        uiState.itemsInOutfit.forEach { item ->
-                            OutfitItemRow(
-                                item = item,
-                                onClick = { onItemClick(item.id) }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.weight(1f))
 
                 Button(
                     onClick = { onNavigateToFullOutfitDetail(outfit.id) },

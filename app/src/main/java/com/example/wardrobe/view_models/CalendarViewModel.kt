@@ -1,6 +1,5 @@
 package com.example.wardrobe.view_models
 
-import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,6 +7,7 @@ import com.example.wardrobe.database.OutfitRepository
 import com.example.wardrobe.database.entities.Outfit
 import com.example.wardrobe.database.entities.ScheduledOutfit
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,8 +59,24 @@ class CalendarViewModel @Inject constructor(
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
     val allOutfitsFlow = outfitRepository.getAll()
 
+    // Cache the latest scheduled list so date changes don't need to start a new collector.
+    private var allScheduled: List<ScheduledOutfit> = emptyList()
+    private var outfitsForDateJob: Job? = null
+
     init {
-        loadScheduledOutfits()
+        viewModelScope.launch {
+            outfitRepository.getAllScheduled().collect { scheduledOutfits ->
+                allScheduled = scheduledOutfits
+                val eventDaysSet = scheduledOutfits.mapNotNull { scheduled ->
+                    scheduled.date?.let { dateInMillis ->
+                        Date(dateInMillis).toInstant()
+                            .atZone(ZoneId.systemDefault()).toLocalDate()
+                    }
+                }.toSet()
+                _uiState.update { it.copy(isLoading = false, eventDays = eventDaysSet) }
+                updateOutfitsForSelectedDate(uiState.value.selectedDate)
+            }
+        }
         if (outfitId != null && outfitId != -1) {
             viewModelScope.launch {
                 outfitRepository.getById(outfitId).collect { outfit ->
@@ -72,73 +88,55 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
-    private fun loadScheduledOutfits() {
-        viewModelScope.launch {
-            outfitRepository.getAllScheduled().collect { scheduledOutfits ->
-                val eventDaysSet = scheduledOutfits.mapNotNull { scheduled ->
-                    scheduled.date?.let { dateInMillis ->
-                        Date(dateInMillis).toInstant()
-                            .atZone(ZoneId.systemDefault()).toLocalDate()
+    private fun updateOutfitsForSelectedDate(date: LocalDate) {
+        outfitsForDateJob?.cancel()
+        val scheduledForDate = allScheduled.filter { scheduled ->
+            scheduled.date?.let {
+                Date(it).toInstant().atZone(ZoneId.systemDefault())
+                    .toLocalDate() == date
+            } ?: false
+        }
+        if (scheduledForDate.isEmpty()) {
+            _uiState.update { it.copy(outfitsForSelectedDate = emptyList()) }
+            return
+        }
+        val outfitIdsForDate = scheduledForDate.map { it.outfitId }
+        outfitsForDateJob = viewModelScope.launch {
+            outfitRepository.getOutfitsByIds(outfitIdsForDate).collect { outfits ->
+                val scheduledOutfitPairs = scheduledForDate.mapNotNull { scheduled ->
+                    outfits.find { it.id == scheduled.outfitId }?.let { outfit ->
+                        scheduled to outfit
                     }
-                }.toSet()
-                updateOutfitsForSelectedDate(uiState.value.selectedDate, scheduledOutfits)
-
-                _uiState.update { it.copy(isLoading = false, eventDays = eventDaysSet) }
+                }
+                _uiState.update { it.copy(outfitsForSelectedDate = scheduledOutfitPairs) }
             }
         }
     }
-
-    private fun updateOutfitsForSelectedDate(date: LocalDate, allScheduled: List<ScheduledOutfit>) {
-        viewModelScope.launch {
-            val scheduledForDate = allScheduled
-                .filter { scheduled ->
-                    scheduled.date?.let {
-                        Date(it).toInstant().atZone(ZoneId.systemDefault())
-                            .toLocalDate() == date
-                    } ?: false
-                }
-
-            if (scheduledForDate.isNotEmpty()) {
-                val outfitIdsForDate = scheduledForDate.map { it.outfitId }
-                outfitRepository.getOutfitsByIds(outfitIdsForDate).collect { outfits ->
-                    val scheduledOutfitPairs = scheduledForDate.mapNotNull { scheduled ->
-                        outfits.find { it.id == scheduled.outfitId }?.let { outfit ->
-                            scheduled to outfit
-                        }
-                    }
-                    _uiState.update { it.copy(outfitsForSelectedDate = scheduledOutfitPairs) }
-                }
-            } else {
-                _uiState.update { it.copy(outfitsForSelectedDate = emptyList()) }
-            }
-        }
-    }
-
 
     fun onEvent(event: CalendarEvent) {
         when (event) {
             is CalendarEvent.DateSelected -> {
                 _uiState.update { it.copy(selectedDate = event.date) }
-                loadScheduledOutfits()
+                updateOutfitsForSelectedDate(event.date)
             }
             is CalendarEvent.ScheduleOutfitForDate -> {
-                    viewModelScope.launch {
-                        val scheduledOutfit = ScheduledOutfit(
-                            outfitId = event.outfit.id,
-                            date = uiState.value.selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-                            temperature = event.temperature
-                        )
-                        outfitRepository.insertScheduledOutfit(scheduledOutfit)
-                        _uiState.update { it.copy(isOutfitSelectionDialogVisible = false) }
-                        loadScheduledOutfits()
-                    }
+                viewModelScope.launch {
+                    val scheduledOutfit = ScheduledOutfit(
+                        outfitId = event.outfit.id,
+                        date = uiState.value.selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                        temperature = event.temperature
+                    )
+                    outfitRepository.insertScheduledOutfit(scheduledOutfit)
+                    _uiState.update { it.copy(isOutfitSelectionDialogVisible = false) }
+                    // No reload needed: the getAllScheduled() flow above re-emits automatically.
+                }
             }
             is CalendarEvent.AddOutfitForDate -> {
                 _uiState.update { it.copy(isOutfitSelectionDialogVisible = true) }
             }
             is CalendarEvent.AddItemForScheduledOutfit -> {
-                Log.d("CalendarViewModel", "Adding item for scheduled outfit with ID: ${event.scheduledOutfitId}")
-                _navigationEvent.value = CalendarNavigationEvent.NavigateToEditScheduledOutfit(event.scheduledOutfitId)
+                _navigationEvent.value =
+                    CalendarNavigationEvent.NavigateToEditScheduledOutfit(event.scheduledOutfitId)
             }
             is CalendarEvent.DismissOutfitSelectionDialog -> {
                 _uiState.update { it.copy(isOutfitSelectionDialogVisible = false) }

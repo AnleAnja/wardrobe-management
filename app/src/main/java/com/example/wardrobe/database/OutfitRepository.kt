@@ -44,20 +44,25 @@ class OutfitRepository @Inject constructor(
 
     suspend fun insertScheduledOutfit(scheduledOutfit: ScheduledOutfit) {
         scheduledOutfitDao.insertOutfit(scheduledOutfit)
+
+        // Only count this as an actual wear when the date is today or in the past;
+        // future schedules are plans, not wears.
+        val date = scheduledOutfit.date
+        val isPastOrToday = date != null && date <= System.currentTimeMillis()
+        if (!isPastOrToday) return
+
         val outfit = outfitDao.getById(scheduledOutfit.outfitId).first()
         outfit?.let {
-            val newLastWorn = scheduledOutfit.date ?: 0L
             outfitDao.updateOutfit(it.copy(
                 timesWorn = it.timesWorn + 1,
-                lastWorn = if (newLastWorn > (it.lastWorn ?: 0L)) newLastWorn else it.lastWorn
+                lastWorn = if (date > (it.lastWorn ?: 0L)) date else it.lastWorn
             ))
         }
         val items = outfitItemDao.getItemsForOutfit(scheduledOutfit.outfitId).first()
         items.forEach {
-            val newItemLastWorn = scheduledOutfit.date ?: 0L
             wardrobeItemDao.updateItem(it.copy(
                 timesWorn = it.timesWorn + 1,
-                lastWorn = if (newItemLastWorn > (it.lastWorn ?: 0L)) newItemLastWorn else it.lastWorn
+                lastWorn = if (date > (it.lastWorn ?: 0L)) date else it.lastWorn
             ))
         }
     }

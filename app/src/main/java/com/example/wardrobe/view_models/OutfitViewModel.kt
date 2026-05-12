@@ -1,6 +1,5 @@
 package com.example.wardrobe.view_models
 
-import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -174,7 +173,6 @@ class OutfitsViewModel @Inject constructor(
                                 .toEpochMilli(),
                             temperature = null
                         )
-                        Log.d("OutfitViewModel", "Inserting scheduled outfit: $scheduledOutfit at Date $date")
                         repository.insertScheduledOutfit(scheduledOutfit)
                         _navigationEvent.value = NavigationEvent.NavigateBack
                     }

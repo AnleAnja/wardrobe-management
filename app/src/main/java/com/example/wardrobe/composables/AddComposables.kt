@@ -1,8 +1,6 @@
 package com.example.wardrobe.composables
 
 import GalleryCard
-import android.content.Intent
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -203,9 +202,7 @@ fun AddItemForm(uiState: AddItemUiState, viewModel: AddItemViewModel) {
         ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-            context.contentResolver.takePersistableUriPermission(uri, flags)
-            viewModel.onEvent(AddItemEvent.ImageUriChanged(uri.toString()))
+            viewModel.onEvent(AddItemEvent.ImageUriChanged(uri))
         }
     }
 
@@ -592,9 +589,9 @@ private fun ImagePickerCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f) // Erzwinge ein quadratisches Seitenverhältnis für den Container
-                .clip(RoundedCornerShape(8.dp)) // Clip vor dem Zeichnen des Bildes
-                .background(MaterialTheme.colorScheme.surfaceVariant), // Hintergrund für den Fall, dass das Bild lädt
+                .heightIn(max = 400.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             AsyncImage(
@@ -603,8 +600,8 @@ private fun ImagePickerCard(
                     .crossfade(true)
                     .build(),
                 contentDescription = "Selected image",
-                contentScale = ContentScale.Crop, // Schneidet das Bild zu, damit es den Container füllt
-                modifier = Modifier.fillMaxSize() // Füllt den quadratischen Box-Container
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth()
             )
             IconButton(
                 onClick = onClearClick,
@@ -693,17 +690,13 @@ private fun AddOutfitForm(
     val pickTeaserMedia =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) {
-                val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                context.contentResolver.takePersistableUriPermission(uri, flags)
-                viewModel.onEvent(AddOutfitEvent.ImageUriTeaserChanged(uri.toString()))
+                viewModel.onEvent(AddOutfitEvent.ImageUriTeaserChanged(uri))
             }
         }
     val pickCombinedMedia =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) {
-                val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                context.contentResolver.takePersistableUriPermission(uri, flags)
-                viewModel.onEvent(AddOutfitEvent.ImageUriCombinedChanged(uri.toString()))
+                viewModel.onEvent(AddOutfitEvent.ImageUriCombinedChanged(uri))
             }
         }
 
