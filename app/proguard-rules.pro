@@ -5,17 +5,16 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep crash-relevant attributes for stack traces and Gson generic types.
+-keepattributes SourceFile,LineNumberTable
+-keepattributes Signature
+-keepattributes *Annotation*
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Gson hits these via reflection during JSON import/export. Keep their
+# fields so member names match the on-disk JSON.
+-keep class com.example.wardrobe.json_parser.WardrobeImport { *; }
+-keep class com.example.wardrobe.json_parser.**Json { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Gson TypeToken anonymous subclasses (used by Converters.kt for List<String?>).
+-keep class * extends com.google.gson.reflect.TypeToken

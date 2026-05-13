@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -201,9 +202,7 @@ fun AddItemForm(uiState: AddItemUiState, viewModel: AddItemViewModel) {
         ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-            context.contentResolver.takePersistableUriPermission(uri, flags)
-            viewModel.onEvent(AddItemEvent.ImageUriChanged(uri.toString()))
+            viewModel.onEvent(AddItemEvent.ImageUriChanged(uri))
         }
     }
 
@@ -577,7 +576,7 @@ private fun ImagePickerCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
+                .heightIn(max = 400.dp)
                 .clip(MaterialTheme.shapes.extraLarge)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
@@ -588,8 +587,8 @@ private fun ImagePickerCard(
                     .crossfade(true)
                     .build(),
                 contentDescription = "Selected image",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth()
             )
             IconButton(
                 onClick = onClearClick,
@@ -678,17 +677,13 @@ private fun AddOutfitForm(
     val pickTeaserMedia =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) {
-                val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                context.contentResolver.takePersistableUriPermission(uri, flags)
-                viewModel.onEvent(AddOutfitEvent.ImageUriTeaserChanged(uri.toString()))
+                viewModel.onEvent(AddOutfitEvent.ImageUriTeaserChanged(uri))
             }
         }
     val pickCombinedMedia =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) {
-                val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                context.contentResolver.takePersistableUriPermission(uri, flags)
-                viewModel.onEvent(AddOutfitEvent.ImageUriCombinedChanged(uri.toString()))
+                viewModel.onEvent(AddOutfitEvent.ImageUriCombinedChanged(uri))
             }
         }
 

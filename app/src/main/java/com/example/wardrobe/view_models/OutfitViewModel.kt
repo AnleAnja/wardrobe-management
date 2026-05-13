@@ -1,6 +1,5 @@
 package com.example.wardrobe.view_models
 
-import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -143,6 +142,7 @@ class OutfitsViewModel @Inject constructor(
             OutfitSortOption.RECENTLY_WORN -> outfits.sortedByDescending { it.lastWorn }
             OutfitSortOption.LEAST_RECENTLY_WORN -> outfits.sortedBy { it.lastWorn }
             OutfitSortOption.HIGHEST_RATING -> outfits.sortedByDescending { it.rating }
+            OutfitSortOption.SEASON -> outfits.sortedBy { it.seasons ?: "" }
             null -> outfits
         }
     }
@@ -174,7 +174,6 @@ class OutfitsViewModel @Inject constructor(
                                 .toEpochMilli(),
                             temperature = null
                         )
-                        Log.d("OutfitViewModel", "Inserting scheduled outfit: $scheduledOutfit at Date $date")
                         repository.insertScheduledOutfit(scheduledOutfit)
                         _navigationEvent.value = NavigationEvent.NavigateBack
                     }

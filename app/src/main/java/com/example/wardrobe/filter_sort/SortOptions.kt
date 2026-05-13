@@ -19,7 +19,8 @@ enum class OutfitSortOption(override val displayName: String) : SortOption {
     LEAST_WORN("Least Worn"),
     RECENTLY_WORN("Recently Worn"),
     LEAST_RECENTLY_WORN("Least Recently Worn"),
-    HIGHEST_RATING("Highest Rating")
+    HIGHEST_RATING("Highest Rating"),
+    SEASON("Season")
 }
 
 data class WardrobeFilters(

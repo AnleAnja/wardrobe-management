@@ -7,12 +7,14 @@ import com.example.wardrobe.database.OutfitRepository
 import com.example.wardrobe.database.entities.Outfit
 import com.example.wardrobe.database.entities.ScheduledOutfit
 import com.example.wardrobe.database.entities.WardrobeItem
+import com.example.wardrobe.storage.ImageStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -46,6 +48,7 @@ sealed class OutfitDetailEvent {
 @HiltViewModel
 class OutfitDetailViewModel @Inject constructor(
     private val repository: OutfitRepository,
+    private val imageStorage: ImageStorage,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val outfitId = savedStateHandle.get<Int?>("outfitId")
@@ -142,7 +145,16 @@ class OutfitDetailViewModel @Inject constructor(
 
     fun deleteOutfit(outfitId: Int) {
         viewModelScope.launch {
+            val outfit = repository.getById(outfitId).firstOrNull()
             repository.deleteOutfit(outfitId)
+            imageStorage.deleteImage(outfit?.imageUriTeaser)
+            imageStorage.deleteImage(outfit?.imageUriCombined)
+        }
+    }
+
+    fun deleteScheduledOutfit(scheduledOutfitId: Int) {
+        viewModelScope.launch {
+            repository.deleteScheduledOutfit(scheduledOutfitId)
         }
     }
 

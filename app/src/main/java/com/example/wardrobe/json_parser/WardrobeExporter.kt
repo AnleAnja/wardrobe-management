@@ -2,16 +2,15 @@ package com.example.wardrobe.json_parser
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import com.example.wardrobe.database.AppDatabase
 import com.example.wardrobe.database.entities.Outfit
 import com.example.wardrobe.database.entities.OutfitItem
+import com.example.wardrobe.database.entities.ScheduledItem
 import com.example.wardrobe.database.entities.ScheduledOutfit
 import com.example.wardrobe.database.entities.WardrobeItem
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 class WardrobeExporter @Inject constructor(private val database: AppDatabase) {
@@ -23,14 +22,14 @@ class WardrobeExporter @Inject constructor(private val database: AppDatabase) {
             val outfits = database.outfitDao().getAll().first()
             val outfitItems = database.outfitItemDao().getAll().first()
             val scheduledOutfits = database.scheduledOutfitDao().getAll().first()
-
-            Log.d("WardrobeExporter", "WardrobeItems: $wardrobeItems")
+            val scheduledItems = database.scheduledItemDao().getAll().first()
 
             val exportData = WardrobeImport(
                 wardrobeItems = wardrobeItems.map { it.toJson() },
                 outfits = outfits.map { it.toJson() },
                 outfitItems = outfitItems.map { it.toJson() },
-                scheduledOutfits = scheduledOutfits.map { it.toJson() }
+                scheduledOutfits = scheduledOutfits.map { it.toJson() },
+                scheduledItems = scheduledItems.map { it.toJson() }
             )
 
             val jsonString = gson.toJson(exportData)
@@ -51,6 +50,7 @@ private fun WardrobeItem.toJson() =
         id = id,
         imageUri = imageUri,
         category = category,
+        subcategory = subcategory,
         rating = rating,
         price = price,
         purchaseDate = purchaseDate,
@@ -64,7 +64,10 @@ private fun Outfit.toJson() =
         id = id,
         imageUriCombined = imageUriCombined,
         imageUriTeaser = imageUriTeaser,
-        seasons = seasons
+        seasons = seasons,
+        rating = rating,
+        timesWorn = timesWorn,
+        lastWorn = lastWorn
     )
 
 private fun OutfitItem.toJson() =
@@ -79,4 +82,10 @@ private fun ScheduledOutfit.toJson() =
         outfitId = outfitId,
         date = date,
         temperature = temperature
+    )
+
+private fun ScheduledItem.toJson() =
+    ScheduledItemJson(
+        scheduledOutfitId = scheduledOutfitId,
+        itemId = itemId
     )

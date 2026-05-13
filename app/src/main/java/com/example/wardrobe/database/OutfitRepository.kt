@@ -38,26 +38,35 @@ class OutfitRepository @Inject constructor(
         return outfitItemDao.getItemsForOutfit(outfitId)
     }
 
+    fun getOutfitsForItem(itemId: Int): Flow<List<Outfit>> {
+        return outfitItemDao.getOutfitsForItem(itemId)
+    }
+
     suspend fun insertOutfit(outfit: Outfit): Long {
         return outfitDao.insertOutfit(outfit)
     }
 
     suspend fun insertScheduledOutfit(scheduledOutfit: ScheduledOutfit) {
         scheduledOutfitDao.insertOutfit(scheduledOutfit)
+
+        // Only count this as an actual wear when the date is today or in the past;
+        // future schedules are plans, not wears.
+        val date = scheduledOutfit.date
+        val isPastOrToday = date != null && date <= System.currentTimeMillis()
+        if (!isPastOrToday) return
+
         val outfit = outfitDao.getById(scheduledOutfit.outfitId).first()
         outfit?.let {
-            val newLastWorn = scheduledOutfit.date ?: 0L
             outfitDao.updateOutfit(it.copy(
                 timesWorn = it.timesWorn + 1,
-                lastWorn = if (newLastWorn > (it.lastWorn ?: 0L)) newLastWorn else it.lastWorn
+                lastWorn = if (date > (it.lastWorn ?: 0L)) date else it.lastWorn
             ))
         }
         val items = outfitItemDao.getItemsForOutfit(scheduledOutfit.outfitId).first()
         items.forEach {
-            val newItemLastWorn = scheduledOutfit.date ?: 0L
             wardrobeItemDao.updateItem(it.copy(
                 timesWorn = it.timesWorn + 1,
-                lastWorn = if (newItemLastWorn > (it.lastWorn ?: 0L)) newItemLastWorn else it.lastWorn
+                lastWorn = if (date > (it.lastWorn ?: 0L)) date else it.lastWorn
             ))
         }
     }
@@ -72,6 +81,10 @@ class OutfitRepository @Inject constructor(
 
     suspend fun deleteOutfit(id: Int) {
         outfitDao.deleteOutfit(id)
+    }
+
+    suspend fun deleteScheduledOutfit(id: Int) {
+        scheduledOutfitDao.deleteOutfit(id)
     }
 
     suspend fun insertScheduledItem(item: ScheduledItem) {
