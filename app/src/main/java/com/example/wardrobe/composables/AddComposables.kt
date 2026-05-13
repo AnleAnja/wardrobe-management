@@ -1,6 +1,5 @@
 package com.example.wardrobe.composables
 
-import GalleryCard
 import android.content.Intent
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -48,7 +47,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
@@ -272,9 +270,9 @@ fun AddItemForm(uiState: AddItemUiState, viewModel: AddItemViewModel) {
                 placeholder = { Text("Select Date") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(color = Color.Black, width = 1.dp, shape = RoundedCornerShape(8.dp))
                     .clickable { showDatePicker = true },
-                enabled = false
+                readOnly = true,
+                shape = MaterialTheme.shapes.medium
             )
             Text(
                 "Category",
@@ -364,24 +362,10 @@ fun AddItemForm(uiState: AddItemUiState, viewModel: AddItemViewModel) {
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(top = 2.dp)
             )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                repeat(5) { index ->
-                    val rating = index + 1
-                    Button(
-                        onClick = { viewModel.onEvent(AddItemEvent.RatingChanged(rating)) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (rating <= uiState.rating)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Text("★")
-                    }
-                }
-            }
+            ModernRatingSelector(
+                rating = uiState.rating,
+                onRatingSelected = { rating -> viewModel.onEvent(AddItemEvent.RatingChanged(rating)) }
+            )
             Text(
                 "Price",
                 style = MaterialTheme.typography.labelLarge,
@@ -543,6 +527,7 @@ private fun ImagePickerCard(
     enabled: Boolean = true
 ) {
     val dashEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+    val outlineColor = MaterialTheme.colorScheme.outline
     if (imageUri == null) {
         Box(
             modifier = Modifier
@@ -550,12 +535,12 @@ private fun ImagePickerCard(
                 .height(150.dp)
                 .drawBehind {
                     drawRoundRect(
-                        color = Color.Gray,
+                        color = outlineColor,
                         style = Stroke(
                             width = 1.dp.toPx(),
                             pathEffect = dashEffect
                         ),
-                        cornerRadius = CornerRadius(8.dp.toPx())
+                        cornerRadius = CornerRadius(20.dp.toPx())
                     )
                 }
                 .clickable(
@@ -576,7 +561,7 @@ private fun ImagePickerCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "Upload a file",
+                    "Upload a photo",
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -592,9 +577,9 @@ private fun ImagePickerCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f) // Erzwinge ein quadratisches Seitenverhältnis für den Container
-                .clip(RoundedCornerShape(8.dp)) // Clip vor dem Zeichnen des Bildes
-                .background(MaterialTheme.colorScheme.surfaceVariant), // Hintergrund für den Fall, dass das Bild lädt
+                .aspectRatio(1f)
+                .clip(MaterialTheme.shapes.extraLarge)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             AsyncImage(
@@ -603,8 +588,8 @@ private fun ImagePickerCard(
                     .crossfade(true)
                     .build(),
                 contentDescription = "Selected image",
-                contentScale = ContentScale.Crop, // Schneidet das Bild zu, damit es den Container füllt
-                modifier = Modifier.fillMaxSize() // Füllt den quadratischen Box-Container
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
             )
             IconButton(
                 onClick = onClearClick,
@@ -743,25 +728,11 @@ private fun AddOutfitForm(
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(top = 2.dp)
             )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                repeat(5) { index ->
-                    val rating = index + 1
-                    Button(
-                        onClick = { viewModel.onEvent(AddOutfitEvent.RatingChanged(rating)) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (rating <= uiState.rating)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                        enabled = !isScheduledOutfit
-                    ) {
-                        Text("★")
-                    }
-                }
-            }
+            ModernRatingSelector(
+                rating = uiState.rating,
+                onRatingSelected = { rating -> viewModel.onEvent(AddOutfitEvent.RatingChanged(rating)) },
+                enabled = !isScheduledOutfit
+            )
         }
         item {
             Spacer(Modifier.height(8.dp))
@@ -961,11 +932,10 @@ fun ItemSelector(
                         )
                         .clickable { onItemToggle(item.id) }
                 ) {
-                    GalleryCard(
-                        item = item,
-                        imageUriProvider = { it.imageUri },
-                        contentDescriptionProvider = { it.category },
-                        onClick = { onItemToggle(item.id) }
+                    ModernMediaCard(
+                        imageUri = item.imageUri,
+                        contentDescription = item.modernTitle(),
+                        modifier = Modifier.fillMaxSize()
                     )
                     if (isSelected) {
                         Box(
@@ -979,18 +949,18 @@ fun ItemSelector(
                             Icon(
                                 Icons.Default.Check,
                                 contentDescription = "Selected",
-                                tint = Color.White
+                                tint = MaterialTheme.colorScheme.onPrimary
                             )
                         }
                         if (isLocked) {
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = "Locked Item",
-                                tint = Color.White.copy(alpha = 0.9f),
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
                                     .padding(6.dp)
-                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f), CircleShape)
                                     .padding(4.dp)
                                     .size(16.dp)
                             )

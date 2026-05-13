@@ -6,6 +6,8 @@
 .idea/
 .gradle/
 .navigation/
+.cursor/
+Docs/
 local.properties
 .DS_Store
 build/
