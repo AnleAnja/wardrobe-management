@@ -56,7 +56,8 @@ import com.example.wardrobe.CategoryHierarchy
 @Composable
 fun FilterChips(
     onSortClick: () -> Unit,
-    onFilterClick: () -> Unit
+    onFilterClick: () -> Unit,
+    activeFilterCount: Int = 0
 ) {
     Row(
         modifier = Modifier
@@ -70,18 +71,18 @@ fun FilterChips(
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.SwapVert,
-                    contentDescription = "Sort",
+                    contentDescription = null,
                     modifier = Modifier.size(AssistChipDefaults.IconSize)
                 )
             }
         )
         AssistChip(
             onClick = onFilterClick,
-            label = { Text("Filter") },
+            label = { Text(if (activeFilterCount > 0) "Filter $activeFilterCount" else "Filter") },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.FilterList,
-                    contentDescription = "Filter",
+                    contentDescription = null,
                     modifier = Modifier.size(AssistChipDefaults.IconSize)
                 )
             }
@@ -357,7 +358,9 @@ fun FilterDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    onApplyFilters(localSelectedCategories.toSet(), localSelectedSeasons,
+                    onApplyFilters(
+                        localSelectedCategories.toSet(),
+                        localSelectedSeasons,
                         localTempInput.toIntOrNull()
                     )
                 }

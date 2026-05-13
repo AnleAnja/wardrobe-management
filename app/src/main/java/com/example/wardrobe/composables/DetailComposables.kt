@@ -191,109 +191,47 @@ fun ItemDetailsContent(
     onOutfitClick: (Int) -> Unit
 ) {
     when {
-        uiState.isLoading -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        }
+        uiState.isLoading -> ModernLoadingState()
 
-        uiState.errorMessage != null -> {
-            Column {
-                Text(
-                    text = uiState.errorMessage,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-        }
+        uiState.errorMessage != null -> ModernErrorState(message = uiState.errorMessage)
 
         else -> {
-            uiState.item?.let {
-                val context = LocalContext.current
+            uiState.item?.let { item ->
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Card(
+                    ModernMediaCard(
+                        imageUri = item.imageUri,
+                        contentDescription = item.modernTitle(),
                         modifier = Modifier
+                            .fillMaxWidth()
                             .aspectRatio(0.75f),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(it.imageUri)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = "Selected image",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    Column {
-                        Text(
-                            "Details",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        val categoryDescription = "${it.category} > ${it.subcategory}"
-                        DetailRow(label = "Category", value = categoryDescription)
-                        HorizontalDivider(
-                            Modifier,
-                            DividerDefaults.Thickness,
-                            DividerDefaults.color
-                        )
-                        DetailRow(label = "Seasons", value = it.seasons)
-                        HorizontalDivider(
-                            Modifier,
-                            DividerDefaults.Thickness,
-                            DividerDefaults.color
-                        )
-                        val rating = if (it.rating == null || it.rating <= 0) {
-                            "-"
-                        } else {
-                            "★".repeat(it.rating)
-                        }
-                        DetailRow(label = "Rating", value = rating)
-                        HorizontalDivider(
-                            Modifier,
-                            DividerDefaults.Thickness,
-                            DividerDefaults.color
-                        )
-                        DetailRow(label = "Price", value = "${it.price} €")
-                        HorizontalDivider(
-                            Modifier,
-                            DividerDefaults.Thickness,
-                            DividerDefaults.color
-                        )
-                        DetailRow(label = "Times Worn", value = it.timesWorn.toString())
-                        HorizontalDivider(
-                            Modifier,
-                            DividerDefaults.Thickness,
-                            DividerDefaults.color
-                        )
+                        contentScale = ContentScale.Fit
+                    )
+                    ModernSectionCard(title = "Details") {
+                        val categoryDescription = listOfNotNull(item.category, item.subcategory)
+                            .filter { it.isNotBlank() }
+                            .joinToString(" / ")
+                        ModernDetailRow(label = "Category", value = categoryDescription)
+                        ModernDetailRow(label = "Seasons", value = item.seasons)
+                        ModernDetailRow(label = "Rating", value = item.rating?.takeIf { it > 0 }?.let { "$it/5" })
+                        ModernDetailRow(label = "Price", value = item.price?.let { "$it €" })
+                        ModernDetailRow(label = "Times worn", value = item.timesWorn.toString())
                         val daysText = when (uiState.daysSinceLastWear) {
                             null -> "Never worn"
                             0 -> "Today"
                             1 -> "Yesterday"
                             else -> "${uiState.daysSinceLastWear} days ago"
                         }
-                        DetailRow(label = "Last Worn", value = daysText)
-                        HorizontalDivider(
-                            Modifier,
-                            DividerDefaults.Thickness,
-                            DividerDefaults.color
-                        )
-                        val formattedDate = it.purchaseDate?.let {
+                        ModernDetailRow(label = "Last worn", value = daysText)
+                        val formattedDate = item.purchaseDate?.let {
                             SimpleDateFormat("dd MMMM yyyy", Locale.getDefault()).format(Date(it))
                         } ?: "Not set"
-                        DetailRow(label = "Purchase Date", value = formattedDate)
+                        ModernDetailRow(label = "Purchase date", value = formattedDate)
                     }
                     if (uiState.outfits.isNotEmpty()) {
                         Column {
@@ -340,25 +278,7 @@ fun ItemDetailsContent(
                         }
                     }
                 }
-            } ?: Text("Item Details würden hier stehen...")
-
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-    }
-}
-
-@Composable
-private fun DetailRow(label: String, value: String?) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, fontSize = 16.sp, color = Color.Gray)
-        if (value != null) {
-            Text(value, fontSize = 16.sp, color = Color.Black)
+            } ?: ModernEmptyState("No item found", "This item is no longer available.")
         }
     }
 }
@@ -370,23 +290,9 @@ fun OutfitDetailsContent(
     onItemClick: (Int) -> Unit
 ) {
     when {
-        uiState.isLoading -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        }
+        uiState.isLoading -> ModernLoadingState()
 
-        uiState.errorMessage != null -> {
-            Column {
-                Text(
-                    text = uiState.errorMessage,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-        }
+        uiState.errorMessage != null -> ModernErrorState(message = uiState.errorMessage)
 
         uiState.isCalendarDialogVisible -> {
             ScheduleOutfitDialog(
@@ -400,13 +306,13 @@ fun OutfitDetailsContent(
         }
 
         else -> {
-            uiState.outfit?.let {
+            uiState.outfit?.let { outfit ->
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     val imageUris = listOf(it.imageUriTeaser, it.imageUriCombined)
                     val pagerState = rememberPagerState(pageCount = { imageUris.size })
@@ -420,18 +326,12 @@ fun OutfitDetailsContent(
                                 .fillMaxWidth()
                                 .aspectRatio(1f)
                         ) { page ->
-                            Card(
+                            ModernMediaCard(
+                                imageUri = imageUris[page],
+                                contentDescription = "Outfit image ${page + 1}",
                                 modifier = Modifier.fillMaxSize(),
-                                shape = RoundedCornerShape(12.dp),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                            ) {
-                                AsyncImage(
-                                    model = imageUris[page],
-                                    contentDescription = "Outfit image ${page + 1}",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
+                                contentScale = ContentScale.Crop
+                            )
                         }
                         Row(
                             Modifier.fillMaxWidth(),
@@ -454,13 +354,10 @@ fun OutfitDetailsContent(
                         }
 
                     }
-                    Text(
-                        "Items",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Card(shape = RoundedCornerShape(12.dp)) {
+                    ModernSectionCard(
+                        title = "Items",
+                        subtitle = "${uiState.itemsInOutfit.size} wardrobe pieces"
+                    ) {
                         Column {
                             uiState.itemsInOutfit.forEach { item ->
                                 OutfitItemRow(
@@ -470,24 +367,10 @@ fun OutfitDetailsContent(
                             }
                         }
                     }
-                    HorizontalDivider(
-                        Modifier,
-                        DividerDefaults.Thickness,
-                        DividerDefaults.color
-                    )
-                    Text(
-                        "Details",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val rating = if (it.rating == null || it.rating <= 0) {
-                        "-"
-                    } else {
-                        "★".repeat(it.rating)
-                    }
-                    DetailRow(label = "Rating", value = rating)
-                    DetailRow(label = "Seasons", value = it.seasons)
+                    ModernSectionCard(title = "Details") {
+                    val rating = outfit.rating?.takeIf { it > 0 }?.let { "$it/5" }
+                    ModernDetailRow(label = "Rating", value = rating)
+                    ModernDetailRow(label = "Seasons", value = outfit.seasons)
                     val temperatureText = if (uiState.minTemp != null && uiState.maxTemp != null) {
                         if (uiState.minTemp == uiState.maxTemp) {
                             "${uiState.minTemp}°C"
@@ -497,41 +380,31 @@ fun OutfitDetailsContent(
                     } else {
                         "Not worn yet"
                     }
-                    DetailRow(
+                    ModernDetailRow(
                         label = "Temperature",
                         value = temperatureText
                     )
-                    HorizontalDivider(
-                        Modifier,
-                        DividerDefaults.Thickness,
-                        DividerDefaults.color
-                    )
-                    Text(
-                        "Stats",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    DetailRow(label = "Times Worn", value = it.timesWorn.toString())
+                    }
+                    ModernSectionCard(title = "Stats") {
+                    ModernDetailRow(label = "Times worn", value = outfit.timesWorn.toString())
                     val daysText = when (uiState.daysSinceLastWear) {
                         null -> "Never worn"
                         0 -> "Today"
                         1 -> "Yesterday"
                         else -> "${uiState.daysSinceLastWear} days ago"
                     }
-                    DetailRow(label = "Last Worn", value = daysText)
+                    ModernDetailRow(label = "Last worn", value = daysText)
+                    }
 
                     Button(
                         onClick = { onEvent(OutfitDetailEvent.AddScheduledOutfit) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 16.dp),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = MaterialTheme.shapes.large,
                     ) { Text("Add to OOTD", modifier = Modifier.padding(vertical = 8.dp)) }
                 }
-            } ?: Text("Item Details würden hier stehen...")
-
-            Spacer(modifier = Modifier.height(16.dp))
+            } ?: ModernEmptyState("No outfit found", "This outfit is no longer available.")
         }
     }
 }
@@ -541,34 +414,7 @@ private fun OutfitItemRow(
     item: WardrobeItem,
     onClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        AsyncImage(
-            model = item.imageUri,
-            contentDescription = item.category,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        )
-        Text(
-            text = item.category ?: "Item",
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f)
-        )
-        Icon(
-            imageVector = Icons.Filled.ChevronRight,
-            contentDescription = "View item details",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+    ModernWardrobeItemListItem(item = item, onClick = onClick)
 }
 
 @Composable
@@ -788,42 +634,25 @@ fun ScheduledOutfitDetailsContent(
         )
     }
     when {
-        uiState.isLoading -> {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        }
-        uiState.errorMessage != null -> {
-            Column {
-                Text(
-                    text = uiState.errorMessage,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-        }
+        uiState.isLoading -> ModernLoadingState()
+        uiState.errorMessage != null -> ModernErrorState(message = uiState.errorMessage)
         outfit != null && scheduledOutfit != null -> {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
             ) {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Row {
-                        val dateAndTempString = buildString {
-                            scheduledOutfit.date?.let { dateMillis ->
-                                val date = Instant.ofEpochMilli(dateMillis)
-                                    .atZone(ZoneId.systemDefault())
-                                    .toLocalDate()
-                                val formatter = DateTimeFormatter.ofPattern("dd/MM")
-                                append(date.format(formatter))
-                            } ?: append("No Date")
-                            scheduledOutfit.temperature?.let { temp ->
-                                append("  ($temp°C)")
-                            }
+                ModernSectionCard(title = "Planned outfit") {
+                    val dateAndTempString = buildString {
+                        scheduledOutfit.date?.let { dateMillis ->
+                            val date = Instant.ofEpochMilli(dateMillis)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+                            val formatter = DateTimeFormatter.ofPattern("dd/MM")
+                            append(date.format(formatter))
+                        } ?: append("No Date")
+                        scheduledOutfit.temperature?.let { temp ->
+                            append("  ($temp°C)")
                         }
                         Text(
                             dateAndTempString,
@@ -835,15 +664,25 @@ fun ScheduledOutfitDetailsContent(
                         IconButton({ onNavigateToEdit(scheduledOutfit.id) }) { Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit") }
                         IconButton({ showDeleteDialog = true }) { Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete") }
                     }
-                    Spacer(Modifier.height(16.dp))
-                    Card(shape = RoundedCornerShape(12.dp)) {
-                        Column {
-                            uiState.itemsInOutfit.forEach { item ->
-                                OutfitItemRow(
-                                    item = item,
-                                    onClick = { onItemClick(item.id) }
-                                )
-                            }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            dateAndTempString,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton({ onNavigateToEdit(scheduledOutfit.id) }) {
+                            Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit planned outfit")
+                        }
+                    }
+                }
+                ModernSectionCard(title = "Items") {
+                    Column {
+                        uiState.itemsInOutfit.forEach { item ->
+                            OutfitItemRow(
+                                item = item,
+                                onClick = { onItemClick(item.id) }
+                            )
                         }
                     }
                 }
@@ -852,12 +691,14 @@ fun ScheduledOutfitDetailsContent(
                     onClick = { onNavigateToFullOutfitDetail(outfit.id) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp)
+                        .padding(top = 16.dp),
+                    shape = MaterialTheme.shapes.large
                 ) {
                     Text("View Full Outfit Details")
                 }
             }
         }
+        else -> ModernEmptyState("No scheduled outfit found", "This planned outfit is no longer available.")
     }
 }
 

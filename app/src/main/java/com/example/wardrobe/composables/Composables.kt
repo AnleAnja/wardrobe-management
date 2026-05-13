@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -40,6 +41,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -114,7 +117,16 @@ fun MainAppContent() {
     } else {
         null // Für alle anderen Routen ist es null.
     }
-    Scaffold(
+    BoxWithConstraints {
+        val useNavigationRail = maxWidth >= 600.dp
+
+        Row(modifier = Modifier.fillMaxSize()) {
+            if (useNavigationRail) {
+                GalleryNavigationRail(navController, currentRoute)
+            }
+
+            Scaffold(
+                modifier = Modifier.weight(1f),
         topBar = {
             val route = currentRoute
             when {
@@ -188,7 +200,9 @@ fun MainAppContent() {
             }
         },
         bottomBar = {
-            GalleryBottomNavBar(navController, currentRoute)
+            if (!useNavigationRail) {
+                GalleryBottomNavBar(navController, currentRoute)
+            }
         }
     ) { innerPadding ->
         NavHost(
@@ -339,6 +353,8 @@ fun MainAppContent() {
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
+        }
+    }
         }
     }
 }
@@ -510,45 +526,13 @@ fun WardrobeGalleryScreen(viewModel: WardrobeViewModel) {
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        FilterChips(
-            onSortClick = { showSortDialog = true },
-            onFilterClick = { showFilterDialog = true }
-        )
-        when {
-            uiState.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-
-            uiState.errorMessage != null -> {
-                Column {
-                    Text(
-                        text = uiState.errorMessage ?: "",
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Button(
-                        onClick = { viewModel.onEvent(WardrobeScreenEvent.RefreshRequested) }
-                    ) {
-                        Text("Retry")
-                    }
-                }
-            }
-
-            else -> {
-                GalleryGrid(
-                    items = uiState.wardrobeItems,
-                    onItemClick = { item -> viewModel.onEvent(WardrobeScreenEvent.ItemClicked(item)) },
-                    imageUriProvider = { wardrobeItem -> wardrobeItem.imageUri },
-                    contentDescriptionProvider = { wardrobeItem -> wardrobeItem.category }
-                )
-            }
-        }
-    }
+    WardrobeGalleryModernContent(
+        uiState = uiState,
+        onSortClick = { showSortDialog = true },
+        onFilterClick = { showFilterDialog = true },
+        onRefreshClick = { viewModel.onEvent(WardrobeScreenEvent.RefreshRequested) },
+        onItemClick = { item -> viewModel.onEvent(WardrobeScreenEvent.ItemClicked(item)) }
+    )
 }
 
 @Composable
@@ -596,55 +580,19 @@ fun OutfitGalleryScreen(viewModel: OutfitsViewModel) {
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        FilterChips(
-            onSortClick = { showSortDialog = true },
-            onFilterClick = { showFilterDialog = true }
-        )
-        when {
-            uiState.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-
-            uiState.errorMessage != null -> {
-                Column {
-                    Text(
-                        text = uiState.errorMessage ?: "",
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Button(
-                        onClick = { viewModel.onEvent(OutfitScreenEvent.RefreshRequested) }
-                    ) {
-                        Text("Retry")
-                    }
-                }
-            }
-
-            else -> {
-                GalleryGrid(
-                    items = uiState.outfits,
-                    onItemClick = { outfit ->
-                        if (uiState.isSelectionMode) {
-                            viewModel.onEvent(OutfitScreenEvent.OutfitSelectedForDate(outfit))
-                        } else {
-                            viewModel.onEvent(OutfitScreenEvent.OutfitClicked(outfit))
-                        }
-                    },
-                    imageUriProvider = { outfit ->
-                        outfit.imageUriTeaser
-                    },
-                    contentDescriptionProvider = { outfit ->
-                        outfit.id.toString()
-                    }
-                )
+    OutfitGalleryModernContent(
+        uiState = uiState,
+        onSortClick = { showSortDialog = true },
+        onFilterClick = { showFilterDialog = true },
+        onRefreshClick = { viewModel.onEvent(OutfitScreenEvent.RefreshRequested) },
+        onOutfitClick = { outfit ->
+            if (uiState.isSelectionMode) {
+                viewModel.onEvent(OutfitScreenEvent.OutfitSelectedForDate(outfit))
+            } else {
+                viewModel.onEvent(OutfitScreenEvent.OutfitClicked(outfit))
             }
         }
-    }
+    )
 }
 
 @Composable
@@ -738,35 +686,61 @@ fun GalleryBottomNavBar(
                 icon = {
                     Icon(
                         imageVector = screen.icon,
-                        contentDescription = screen.label,
-                        tint = if (isSelected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        contentDescription = screen.label
                     )
                 },
                 label = { Text(screen.label) },
                 selected = isSelected,
-                onClick = {
-                    if (currentRoute?.startsWith(screen.route) == true) {
-                        navController.navigate(screen.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = false
-                            }
-                            launchSingleTop = true
-                        }
-                    } else {
-                        navController.navigate(screen.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                }
+                onClick = { navigateToTopLevelScreen(navController, currentRoute, screen) }
             )
+        }
+    }
+}
+
+@Composable
+fun GalleryNavigationRail(
+    navController: NavController,
+    currentRoute: String?
+) {
+    val screens = listOf(Screen.Wardrobe, Screen.Calendar, Screen.Outfits, Screen.Inspiration)
+
+    NavigationRail {
+        screens.forEach { screen ->
+            val isSelected = currentRoute?.startsWith(screen.route) ?: false
+            NavigationRailItem(
+                icon = {
+                    Icon(
+                        imageVector = screen.icon,
+                        contentDescription = screen.label
+                    )
+                },
+                label = { Text(screen.label) },
+                selected = isSelected,
+                onClick = { navigateToTopLevelScreen(navController, currentRoute, screen) }
+            )
+        }
+    }
+}
+
+private fun navigateToTopLevelScreen(
+    navController: NavController,
+    currentRoute: String?,
+    screen: Screen
+) {
+    if (currentRoute?.startsWith(screen.route) == true) {
+        navController.navigate(screen.route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = false
+            }
+            launchSingleTop = true
+        }
+    } else {
+        navController.navigate(screen.route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
         }
     }
 }

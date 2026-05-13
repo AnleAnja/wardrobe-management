@@ -36,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -130,17 +131,18 @@ fun CalendarContent(
 
     Column {
         if (isPlanningMode) {
-            Box(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                shape = MaterialTheme.shapes.large
             ) {
                 Text(
                     text = "Choose a date to plan outfit #${uiState.outfit.id}",
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(16.dp)
                 )
             }
         }
@@ -250,7 +252,7 @@ private fun Day(
             .aspectRatio(1f)
             .padding(2.dp)
             .clip(CircleShape)
-            .background(color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .background(color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
             .clickable(
                 enabled = isFromCurrentMonth,
                 onClick = { onClick(date) }
@@ -264,7 +266,7 @@ private fun Day(
             Text(
                 text = date.dayOfMonth.toString(),
                 color = when {
-                    isSelected -> MaterialTheme.colorScheme.onPrimary
+                    isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
                     isFromCurrentMonth -> MaterialTheme.colorScheme.onSurface
                     else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                 }
@@ -274,7 +276,7 @@ private fun Day(
                     modifier = Modifier
                         .size(5.dp)
                         .background(
-                            if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                            if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
                             CircleShape
                         )
                 )
@@ -290,23 +292,24 @@ fun ScheduledOutfitsList(
     onEvent: (CalendarEvent) -> Unit,
     onOutfitClick: (Int) -> Unit
 ) {
-    Column(modifier = Modifier.padding(16.dp)) {
+    ModernSectionCard(
+        modifier = Modifier.padding(16.dp),
+        title = "Outfits",
+        subtitle = selectedDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL))
+    ) {
         val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)
-        Text(
-            text = "Outfits for ${selectedDate.format(formatter)}",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
         if (scheduledOutfits.isEmpty()) {
-            Text("No outfits planned for this date")
+            Text(
+                text = "No outfits planned for ${selectedDate.format(formatter)}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Button(
                 onClick = { onEvent(CalendarEvent.AddOutfitForDate(selectedDate)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 16.dp),
-                shape = RoundedCornerShape(8.dp),
+                shape = MaterialTheme.shapes.large,
             ) { Text("Add Outfit", modifier = Modifier.padding(vertical = 8.dp)) }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -345,7 +348,7 @@ fun CalendarHeader(
             modifier = Modifier.weight(1f),
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            fontSize = 18.sp
+            style = MaterialTheme.typography.titleMedium
         )
         IconButton(onClick = goToNext) {
             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Month")
@@ -365,7 +368,7 @@ private fun DaysOfWeekTitle(daysOfWeek: List<DayOfWeek>) {
                     java.time.format.TextStyle.SHORT,
                     java.util.Locale.getDefault()
                 ),
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -376,28 +379,11 @@ private fun DaysOfWeekTitle(daysOfWeek: List<DayOfWeek>) {
 private fun OutfitRow(outfit: Outfit,
                       isSelected: Boolean,
                       onRowClick: (Outfit) -> Unit) {
-    Row(Modifier
-        .fillMaxWidth()
-        .clip(RoundedCornerShape(8.dp)) // Ecken abrunden für eine schönere Optik
-        .background(
-            // Hintergrundfarbe basierend auf dem Auswahlstatus ändern
-            if (isSelected) MaterialTheme.colorScheme.primaryContainer
-            else Color.Transparent
-        )
-        .clickable { onRowClick(outfit) }
-        .padding(16.dp), // Padding nach innen anwenden
-        verticalAlignment = Alignment.CenterVertically) {
-        AsyncImage(
-            model = outfit.imageUriTeaser,
-            contentDescription = "Outfit Teaser",
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(4.dp)),
-            contentScale = ContentScale.Crop
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text("Outfit ID: ${outfit.id}")
-    }
+    ModernOutfitListItem(
+        outfit = outfit,
+        isSelected = isSelected,
+        onClick = { onRowClick(outfit) }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
