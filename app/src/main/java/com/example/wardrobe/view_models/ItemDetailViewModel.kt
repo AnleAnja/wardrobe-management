@@ -1,5 +1,6 @@
 package com.example.wardrobe.view_models
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,11 +8,12 @@ import com.example.wardrobe.database.OutfitRepository
 import com.example.wardrobe.database.WardrobeItemRepository
 import com.example.wardrobe.database.entities.Outfit
 import com.example.wardrobe.database.entities.WardrobeItem
+import com.example.wardrobe.R
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -24,6 +26,7 @@ data class ItemDetailUiState(
 )
 @HiltViewModel
 class ItemDetailViewModel @Inject constructor(
+    @ApplicationContext appContext: Context,
     wardrobeItemRepository: WardrobeItemRepository,
     outfitRepository: OutfitRepository,
     savedStateHandle: SavedStateHandle
@@ -31,15 +34,25 @@ class ItemDetailViewModel @Inject constructor(
 
     private val itemId = checkNotNull(savedStateHandle.get<Int>("itemId"))
     val uiState: StateFlow<ItemDetailUiState> =
-        wardrobeItemRepository.getById(itemId)
-            .filterNotNull()
-            .combine(outfitRepository.getOutfitsForItem(itemId)) { item, outfits ->
+        combine(
+            wardrobeItemRepository.getById(itemId),
+            outfitRepository.getOutfitsForItem(itemId)
+        ) { item, outfits ->
+            if (item == null) {
+                ItemDetailUiState(
+                    isLoading = false,
+                    errorMessage = appContext.getString(R.string.error_item_not_found),
+                    item = null,
+                    outfits = emptyList()
+                )
+            } else {
                 ItemDetailUiState(
                     isLoading = false,
                     item = item,
                     outfits = outfits.sortedByDescending { it.lastWorn }
                 )
             }
+        }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000L),

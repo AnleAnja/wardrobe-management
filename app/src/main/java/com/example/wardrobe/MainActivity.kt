@@ -1,6 +1,6 @@
 package com.example.wardrobe
 
-import MainAppContent
+import com.example.wardrobe.composables.MainAppContent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent

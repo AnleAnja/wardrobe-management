@@ -4,17 +4,20 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.wardrobe.view_models.NavigationEvent.NavigateToAddItem
-import com.example.wardrobe.view_models.NavigationEvent.NavigateToItemDetail
 import com.example.wardrobe.database.WardrobeItemRepository
-import com.example.wardrobe.database.entities.Outfit
 import com.example.wardrobe.database.entities.WardrobeItem
 import com.example.wardrobe.filter_sort.WardrobeFilters
 import com.example.wardrobe.filter_sort.WardrobeSortOption
+import com.example.wardrobe.filter_sort.extractAvailableCategories
+import com.example.wardrobe.filter_sort.filterWardrobeItems
+import com.example.wardrobe.filter_sort.sortWardrobeItems
+import com.example.wardrobe.R
 import com.example.wardrobe.json_parser.WardrobeExporter
 import com.example.wardrobe.json_parser.WardrobeImporter
+import com.example.wardrobe.navigation.NavigationEvent
 import com.example.wardrobe.storage.ImageStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,7 +41,6 @@ data class WardrobeUiState(
 )
 
 sealed class WardrobeScreenEvent {
-    // Pass the URI through; the VM reads the file off the main thread.
     data class ImportJson(val context: Context, val uri: Uri) : WardrobeScreenEvent()
     data class ExportJson(val context: Context, val uri: Uri) : WardrobeScreenEvent()
     data object AddItemClicked : WardrobeScreenEvent()
@@ -51,6 +53,7 @@ sealed class WardrobeScreenEvent {
 
 @HiltViewModel
 class WardrobeViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val repository: WardrobeItemRepository,
     private val exporter: WardrobeExporter,
     private val importer: WardrobeImporter,
@@ -62,75 +65,37 @@ class WardrobeViewModel @Inject constructor(
     private val _navigationEvent = MutableStateFlow<NavigationEvent?>(null)
     val navigationEvent: StateFlow<NavigationEvent?> = _navigationEvent.asStateFlow()
 
+    private val _sortOption = MutableStateFlow(WardrobeSortOption.RECENTLY_WORN)
+    private val _filters = MutableStateFlow(WardrobeFilters())
+
     private val allItemsFlow = repository.getAll()
 
     init {
         viewModelScope.launch {
-            combine(allItemsFlow, _uiState) { allItems, state ->
-                val filteredItems = applyFilters(allItems, state.currentFilters)
-                val sortedItems = applySorting(filteredItems, state.currentSortOption)
-                val availableCategories = allItems.mapNotNull { item ->
-                    if (item.category != null && item.subcategory != null) {
-                        Pair(item.category, item.subcategory)
-                    } else {
-                        null
-                    }
-                }.toSet()
-                state.copy(
-                    wardrobeItems = sortedItems,
-                    availableCategories = availableCategories
-                )
+            combine(allItemsFlow, _sortOption, _filters) { allItems, sort, filters ->
+                val filteredItems = filterWardrobeItems(allItems, filters)
+                val sortedItems = sortWardrobeItems(filteredItems, sort)
+                Triple(sortedItems, extractAvailableCategories(allItems), sort to filters)
             }.catch { e ->
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = "Failed to load items: ${e.message}"
+                        errorMessage = appContext.getString(R.string.error_load_items, e.message ?: "")
                     )
                 }
-            }.collect { newState ->
+            }.collect { (sortedItems, availableCategories, sortAndFilters) ->
+                val (sort, filters) = sortAndFilters
                 _uiState.update {
-                    newState.copy(isLoading = false, errorMessage = null)
+                    it.copy(
+                        wardrobeItems = sortedItems,
+                        availableCategories = availableCategories,
+                        currentSortOption = sort,
+                        currentFilters = filters,
+                        isLoading = false,
+                        errorMessage = null
+                    )
                 }
             }
-        }
-    }
-
-    private fun applyFilters(
-        items: List<WardrobeItem>,
-        filters: WardrobeFilters
-    ): List<WardrobeItem> {
-        var filteredList = items
-
-        if (filters.selectedSeasons.isNotEmpty()) {
-            filteredList = filteredList.filter { item ->
-                val itemSeasons = item.seasons?.split(',')?.map { it.trim() } ?: emptyList()
-                filters.selectedSeasons.any { selectedSeason -> itemSeasons.contains(selectedSeason) }
-            }
-        }
-
-        if (filters.selectedCategories.isNotEmpty()) {
-            filteredList = filteredList.filter { item ->
-                item.category != null && item.subcategory != null &&
-                        Pair(item.category, item.subcategory) in filters.selectedCategories
-            }
-        }
-
-        return filteredList
-    }
-
-    private fun applySorting(
-        items: List<WardrobeItem>,
-        sortOption: WardrobeSortOption?
-    ): List<WardrobeItem> {
-        return when (sortOption) {
-            WardrobeSortOption.MOST_WORN -> items.sortedByDescending { it.timesWorn }
-            WardrobeSortOption.LEAST_WORN -> items.sortedBy { it.timesWorn }
-            WardrobeSortOption.RECENTLY_WORN -> items.sortedByDescending { it.lastWorn }
-            WardrobeSortOption.LEAST_RECENTLY_WORN -> items.sortedBy { it.lastWorn }
-            WardrobeSortOption.RECENTLY_PURCHASED -> items.sortedByDescending { it.purchaseDate }
-            WardrobeSortOption.LEAST_RECENTLY_PURCHASED -> items.sortedBy { it.purchaseDate }
-            WardrobeSortOption.HIGHEST_RATING -> items.sortedByDescending { it.rating }
-            null -> items
         }
     }
 
@@ -145,14 +110,14 @@ class WardrobeViewModel @Inject constructor(
                             }
                         }
                         if (jsonContent.isNullOrBlank()) {
-                            _uiState.update { it.copy(errorMessage = "Could not read file") }
+                            _uiState.update { it.copy(errorMessage = appContext.getString(R.string.error_could_not_read_file)) }
                             return@launch
                         }
                         importer.importFromJson(jsonContent).onFailure { e ->
-                            _uiState.update { it.copy(errorMessage = "Import failed: ${e.message}") }
+                            _uiState.update { it.copy(errorMessage = appContext.getString(R.string.error_import_failed, e.message ?: "")) }
                         }
                     } catch (e: Exception) {
-                        _uiState.update { it.copy(errorMessage = "Import failed: ${e.message}") }
+                        _uiState.update { it.copy(errorMessage = appContext.getString(R.string.error_import_failed, e.message ?: "")) }
                     }
                 }
             }
@@ -162,17 +127,17 @@ class WardrobeViewModel @Inject constructor(
                     val result =
                         exporter.exportToJson(event.context.applicationContext, event.uri)
                     result.onFailure { e ->
-                        _uiState.update { it.copy(errorMessage = "Export failed: ${e.message}") }
+                        _uiState.update { it.copy(errorMessage = appContext.getString(R.string.error_export_failed, e.message ?: "")) }
                     }
                 }
             }
 
             is WardrobeScreenEvent.AddItemClicked -> {
-                _navigationEvent.value = NavigateToAddItem
+                _navigationEvent.value = NavigationEvent.NavigateToAddItem
             }
 
             is WardrobeScreenEvent.ItemClicked -> {
-                _navigationEvent.value = NavigateToItemDetail(event.item)
+                _navigationEvent.value = NavigationEvent.NavigateToItemDetail(event.item)
             }
 
             is WardrobeScreenEvent.RefreshRequested -> {
@@ -181,20 +146,19 @@ class WardrobeViewModel @Inject constructor(
                 }
             }
             is WardrobeScreenEvent.ApplyFilters -> {
-                _uiState.update { it.copy(currentFilters = event.filters) }
+                _filters.update { event.filters }
             }
 
             is WardrobeScreenEvent.ApplySortOption -> {
-                _uiState.update { it.copy(currentSortOption = event.sortOption) }
+                _sortOption.update { event.sortOption }
             }
 
             WardrobeScreenEvent.ClearFilters -> {
-                _uiState.update { it.copy(currentFilters = WardrobeFilters()) }
+                _filters.update { WardrobeFilters() }
             }
         }
     }
 
-    // Reset the navigation event after it's consumed by the UI
     fun navigationEventConsumed() {
         _navigationEvent.value = null
     }
@@ -206,14 +170,4 @@ class WardrobeViewModel @Inject constructor(
             imageStorage.deleteImage(item?.imageUri)
         }
     }
-}
-
-// Define sealed classes for navigation events
-sealed class NavigationEvent {
-    data object NavigateToAddItem : NavigationEvent()
-    data class NavigateToItemDetail(val item: WardrobeItem) : NavigationEvent()
-    data object NavigateToAddOutfit : NavigationEvent()
-    data class NavigateToOutfitDetail(val outfit: Outfit) : NavigationEvent()
-    data class NavigateToScheduleOutfit(val outfit: Outfit) : NavigationEvent()
-    data object NavigateBack: NavigationEvent()
 }

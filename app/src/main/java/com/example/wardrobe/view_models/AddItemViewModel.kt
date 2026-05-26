@@ -1,15 +1,16 @@
 package com.example.wardrobe.view_models
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wardrobe.database.WardrobeItemRepository
 import com.example.wardrobe.database.entities.WardrobeItem
+import com.example.wardrobe.R
 import com.example.wardrobe.storage.ImageStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,6 +48,7 @@ sealed class AddItemEvent {
 
 @HiltViewModel
 class AddItemViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val repository: WardrobeItemRepository,
     private val imageStorage: ImageStorage,
     savedStateHandle: SavedStateHandle
@@ -141,7 +143,7 @@ class AddItemViewModel @Inject constructor(
             }
             val newPath = imageStorage.saveImage(source)
             if (newPath == null) {
-                _uiState.update { it.copy(errorMessage = "Could not save image") }
+                _uiState.update { it.copy(errorMessage = appContext.getString(R.string.error_could_not_save_image)) }
                 return@launch
             }
             // Replacing an uncommitted session image: drop the old copy.
@@ -158,7 +160,7 @@ class AddItemViewModel @Inject constructor(
         val state = _uiState.value
 
         if (state.category.isBlank() || state.subcategory.isBlank()) {
-            _uiState.value = state.copy(errorMessage = "Category is required")
+            _uiState.value = state.copy(errorMessage = appContext.getString(R.string.error_category_required))
             return
         }
 
@@ -193,7 +195,7 @@ class AddItemViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.value = state.copy(
                     isLoading = false,
-                    errorMessage = "Failed to save item: ${e.message}"
+                    errorMessage = appContext.getString(R.string.error_save_item_failed, e.message ?: "")
                 )
             }
         }
@@ -205,11 +207,7 @@ class AddItemViewModel @Inject constructor(
         // User cancelled — drop any freshly-copied images that never got persisted.
         val toClean = sessionPaths.toList()
         sessionPaths.clear()
-        if (toClean.isNotEmpty()) {
-            CoroutineScope(Dispatchers.IO).launch {
-                toClean.forEach { imageStorage.deleteImage(it) }
-            }
-        }
+        toClean.forEach { imageStorage.deleteImage(it) }
     }
 
     fun updateSelectedSeasons(selected: List<String>) {

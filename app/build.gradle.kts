@@ -22,6 +22,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     buildTypes {
@@ -41,11 +42,6 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
-    }
-    packagingOptions {
-        resources {
-            excludes += "rome-utils-2.1.0.jar"
-        }
     }
 }
 
@@ -83,8 +79,6 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    implementation(libs.rometools.modules)
-
     coreLibraryDesugaring(libs.core.jdk.desugaring)
 
     // Testing
@@ -95,10 +89,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.collections.immutable)
 
-    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.palette)
 
-    // Compose
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
@@ -119,5 +111,4 @@ dependencies {
     implementation(libs.androidx.window.core)
 
     implementation(libs.accompanist.adaptive)
-    coreLibraryDesugaring(libs.core.jdk.desugaring)
 }

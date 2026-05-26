@@ -14,7 +14,7 @@ object CategoryHierarchy {
             "Skirts Mini", "Skirts Midi", "Skirts Maxi"
         ),
         "Dresses" to listOf(
-            "Dresses Mini", "Dresses Midi", "Dresses Maxi"
+            "Dresses Mini", "Dresses Midi", "Dresses Maxi", "Jumpsuits"
         ),
         "Outerwear" to listOf(
             "Coats", "Trench Coats", "Blazers", "Jackets", "Biker Jackets",

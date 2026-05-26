@@ -2,6 +2,7 @@ package com.example.wardrobe.database
 
 import android.content.Context
 import androidx.room.Room
+import com.example.wardrobe.BuildConfig
 import com.example.wardrobe.database.daos.OutfitDao
 import com.example.wardrobe.database.daos.OutfitItemDao
 import com.example.wardrobe.database.daos.ScheduledItemDao
@@ -25,9 +26,11 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             "wardrobe_db"
-        )
-            .fallbackToDestructiveMigration(true)
-            .build()
+        ).apply {
+            if (BuildConfig.DEBUG) {
+                fallbackToDestructiveMigration(dropAllTables = true)
+            }
+        }.build()
     }
 
     @Provides
