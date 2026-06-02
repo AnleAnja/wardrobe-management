@@ -253,7 +253,7 @@ fun AddScheduledItemScreen(
         }
 
         Button(
-            onClick = { viewModel.onEvent(AddOutfitEvent.SaveOutfit) },
+            onClick = { viewModel.onEvent(AddOutfitEvent.SaveOutfit()) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 16.dp),

@@ -1,6 +1,7 @@
 package com.example.wardrobe.storage
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.core.net.toUri
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -34,6 +35,24 @@ class ImageStorage @Inject constructor(
             context.contentResolver.openInputStream(source)?.use { input ->
                 out.outputStream().use { output -> input.copyTo(output) }
             } ?: return@withContext null
+            Uri.fromFile(out).toString()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** Encode a bitmap (e.g. a rendered outfit canvas) into filesDir and return a `file://` URI string. */
+    suspend fun saveBitmap(bitmap: Bitmap, quality: Int = 95): String? = withContext(Dispatchers.IO) {
+        try {
+            val encodable = if (bitmap.config == Bitmap.Config.HARDWARE) {
+                bitmap.copy(Bitmap.Config.ARGB_8888, false)
+            } else {
+                bitmap
+            } ?: return@withContext null
+            val out = File(baseDir, "${UUID.randomUUID()}.png")
+            out.outputStream().use { output ->
+                encodable.compress(Bitmap.CompressFormat.PNG, quality, output)
+            }
             Uri.fromFile(out).toString()
         } catch (e: Exception) {
             null

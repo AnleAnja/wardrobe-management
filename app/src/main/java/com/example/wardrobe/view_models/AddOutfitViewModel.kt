@@ -1,7 +1,7 @@
 package com.example.wardrobe.view_models
 
 import android.content.Context
-import android.net.Uri
+import android.graphics.Bitmap
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -42,11 +42,11 @@ data class AddOutfitUiState(
     )
 
 sealed class AddOutfitEvent {
-    data class ImageUriChanged(val uri: Uri?) : AddOutfitEvent()
+    data object RemoveImage : AddOutfitEvent()
     data class ItemsChanged(val itemId: Int) : AddOutfitEvent()
     data class SeasonsChanged(val seasons: String) : AddOutfitEvent()
     data class RatingChanged(val rating: Int) : AddOutfitEvent()
-    data object SaveOutfit : AddOutfitEvent()
+    data class SaveOutfit(val combinedImage: Bitmap? = null) : AddOutfitEvent()
     data object ClearSuccess: AddOutfitEvent()
 }
 
@@ -183,52 +183,28 @@ class AddOutfitViewModel @Inject constructor(
             is AddOutfitEvent.RatingChanged -> {
                 _uiState.value = _uiState.value.copy(rating = event.rating)
             }
-            AddOutfitEvent.SaveOutfit -> {
+            is AddOutfitEvent.SaveOutfit -> {
                 if (_uiState.value.selectedItemIds.isNotEmpty()) {
-                    saveOutfit()
+                    saveOutfit(event.combinedImage)
                 }
             }
             AddOutfitEvent.ClearSuccess -> {
                 _uiState.value = _uiState.value.copy(isSuccess = false)
             }
-            is AddOutfitEvent.ImageUriChanged -> handleImagePicked(
-                source = event.uri,
-                currentProvider = { _uiState.value.imageUri },
-                applyTo = { newUri -> _uiState.update { it.copy(imageUri = newUri) } }
-            )
-        }
-    }
-
-    private fun handleImagePicked(
-        source: Uri?,
-        currentProvider: () -> String?,
-        applyTo: (String?) -> Unit
-    ) {
-        viewModelScope.launch {
-            val current = currentProvider()
-            if (source == null) {
-                if (current != null && current in sessionPaths) {
-                    imageStorage.deleteImage(current)
-                    sessionPaths.remove(current)
+            AddOutfitEvent.RemoveImage -> {
+                _uiState.update { currentState ->
+                    val current = currentState.imageUri
+                    if (current != null && current in sessionPaths) {
+                        imageStorage.deleteImage(current)
+                        sessionPaths.remove(current)
+                    }
+                    currentState.copy(imageUri = null)
                 }
-                applyTo(null)
-                return@launch
             }
-            val newPath = imageStorage.saveImage(source)
-            if (newPath == null) {
-                _uiState.update { it.copy(errorMessage = appContext.getString(R.string.error_could_not_save_image)) }
-                return@launch
-            }
-            if (current != null && current in sessionPaths) {
-                imageStorage.deleteImage(current)
-                sessionPaths.remove(current)
-            }
-            sessionPaths.add(newPath)
-            applyTo(newPath)
         }
     }
 
-    private fun saveOutfit() {
+    private fun saveOutfit(combinedImage: Bitmap?) {
         val state = _uiState.value
         viewModelScope.launch {
             try {
@@ -241,17 +217,30 @@ class AddOutfitViewModel @Inject constructor(
 
                     outfitRepository.replaceScheduledItems(scheduledOutfitId, itemsToAdd.toList())
                 } else {
+                    val teaserUri = if (combinedImage != null) {
+                        val saved = imageStorage.saveBitmap(combinedImage)
+                        if (saved == null) {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    errorMessage = appContext.getString(R.string.error_could_not_save_image)
+                                )
+                            }
+                            return@launch
+                        }
+                        sessionPaths.add(saved)
+                        saved
+                    } else {
+                        state.imageUri
+                    }
                     val outfit = Outfit(
                         id = state.outfitId ?: 0,
-                        imageUriTeaser = state.imageUri,
+                        imageUriTeaser = teaserUri,
                         imageUriCombined = null,
                         seasons = _uiState.value.seasons,
                         rating = state.rating.takeIf { it > 0 },
                     )
                     val outfitId = if (outfit.id != 0) {
-                        outfitRepository.getById(outfit.id).firstOrNull()?.imageUriCombined?.let {
-                            imageStorage.deleteImage(it)
-                        }
                         outfitRepository.updateOutfit(outfit)
                         outfit.id
                     } else {
@@ -259,9 +248,10 @@ class AddOutfitViewModel @Inject constructor(
                     }
                     outfitRepository.replaceOutfitItems(outfitId, state.selectedItemIds)
 
-                    if (originalImageUri != null && originalImageUri != state.imageUri) {
+                    if (originalImageUri != null && originalImageUri != teaserUri) {
                         imageStorage.deleteImage(originalImageUri)
                     }
+                    _uiState.update { it.copy(imageUri = teaserUri) }
                     sessionPaths.clear()
                     saveCommitted = true
                 }
@@ -272,7 +262,6 @@ class AddOutfitViewModel @Inject constructor(
                     errorMessage = appContext.getString(R.string.error_save_outfit_failed, e.message ?: "")
                 )
             }
-            // TODO: Implementierung der Bildkombination
         }
     }
 

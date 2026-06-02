@@ -85,7 +85,9 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -115,6 +117,8 @@ fun AddOutfitScreen(
 ) {
     val viewModel: AddOutfitViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsState()
+    val scope = rememberCoroutineScope()
+    val graphicsLayer = rememberGraphicsLayer()
 
     LaunchedEffect(uiState.isSuccess) {
         if (uiState.isSuccess) {
@@ -124,10 +128,19 @@ fun AddOutfitScreen(
     }
     Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.weight(1f)) {
-            AddOutfitForm(uiState, viewModel, isScheduledOutfit)
+            AddOutfitForm(uiState, viewModel, isScheduledOutfit, graphicsLayer)
         }
         Button(
-            onClick = { viewModel.onEvent(AddOutfitEvent.SaveOutfit) },
+            onClick = {
+                if (uiState.imageUri == null && !isScheduledOutfit) {
+                    scope.launch {
+                        val bitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                        viewModel.onEvent(AddOutfitEvent.SaveOutfit(bitmap))
+                    }
+                } else {
+                    viewModel.onEvent(AddOutfitEvent.SaveOutfit())
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
@@ -150,7 +163,8 @@ fun AddOutfitScreen(
 private fun AddOutfitForm(
     uiState: AddOutfitUiState,
     viewModel: AddOutfitViewModel,
-    isScheduledOutfit: Boolean
+    isScheduledOutfit: Boolean,
+    graphicsLayer: androidx.compose.ui.graphics.layer.GraphicsLayer
 ) {
     var isSeasonsMenuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -159,33 +173,30 @@ private fun AddOutfitForm(
         uiState.seasons.split(", ").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
     }
 
-    val pickMedia =
-        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            if (uri != null) {
-                viewModel.onEvent(AddOutfitEvent.ImageUriChanged(uri))
-            }
-        }
+    val selectedItems = remember(uiState.itemsByCategory, uiState.selectedItemIds) {
+        uiState.itemsByCategory.values.flatten().filter { it.id in uiState.selectedItemIds }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            Spacer(Modifier.height(8.dp))
-            ImagePickerCard(
-                imageUri = uiState.imageUri,
-                onPickClick = {
-                    pickMedia.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        if (!isScheduledOutfit) {
+            item {
+                Spacer(Modifier.height(8.dp))
+                if (uiState.imageUri == null) {
+                    OutfitCanvasEditor(
+                        items = selectedItems,
+                        graphicsLayer = graphicsLayer
                     )
-                },
-                onClearClick = {
-                    viewModel.onEvent(AddOutfitEvent.ImageUriChanged(null))
-                },
-                label = "Add Outfit Image",
-                enabled = !isScheduledOutfit
-            )
+                } else {
+                    OutfitImagePreview(
+                        imageUri = uiState.imageUri,
+                        onRemove = { viewModel.onEvent(AddOutfitEvent.RemoveImage) }
+                    )
+                }
+            }
         }
         item {
             Spacer(Modifier.height(8.dp))
@@ -278,6 +289,39 @@ private fun AddOutfitForm(
                 uiState.selectedItemIds,
                 uiState.lockedItemIds,
                 onItemToggle = { viewModel.onEvent(AddOutfitEvent.ItemsChanged(it)) })
+        }
+    }
+}
+
+@Composable
+private fun OutfitImagePreview(
+    imageUri: String?,
+    onRemove: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(3f / 4f)
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        AsyncImage(
+            model = imageUri,
+            contentDescription = "Outfit image",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize()
+        )
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .background(
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                    CircleShape
+                )
+        ) {
+            Icon(Icons.Default.Close, contentDescription = "Remove image")
         }
     }
 }
