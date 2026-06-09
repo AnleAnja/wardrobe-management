@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 data class ItemDetailUiState(
@@ -46,9 +47,13 @@ class ItemDetailViewModel @Inject constructor(
                     outfits = emptyList()
                 )
             } else {
+                val daysSinceLastWear = item.lastWorn?.let {
+                    TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - it).toInt()
+                }
                 ItemDetailUiState(
                     isLoading = false,
                     item = item,
+                    daysSinceLastWear = daysSinceLastWear,
                     outfits = outfits.sortedByDescending { it.lastWorn }
                 )
             }

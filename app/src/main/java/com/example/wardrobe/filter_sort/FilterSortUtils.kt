@@ -24,6 +24,17 @@ fun filterWardrobeItems(items: List<WardrobeItem>, filters: WardrobeFilters): Li
     return filteredList
 }
 
+fun groupWardrobeItemsByCategoryRecentlyWorn(items: List<WardrobeItem>): Map<String, List<WardrobeItem>> {
+    val sorted = items.sortedByDescending { it.lastWorn ?: Long.MIN_VALUE }
+    return sorted
+        .groupBy { it.category ?: "Uncategorized" }
+        .entries
+        .sortedByDescending { (_, categoryItems) ->
+            categoryItems.maxOf { it.lastWorn ?: Long.MIN_VALUE }
+        }
+        .associate { it.key to it.value }
+}
+
 fun sortWardrobeItems(items: List<WardrobeItem>, sortOption: WardrobeSortOption?): List<WardrobeItem> {
     return when (sortOption) {
         WardrobeSortOption.MOST_WORN -> items.sortedByDescending { it.timesWorn }

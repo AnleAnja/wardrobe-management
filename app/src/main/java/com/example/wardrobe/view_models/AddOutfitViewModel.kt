@@ -12,6 +12,7 @@ import com.example.wardrobe.database.entities.OutfitItem
 import com.example.wardrobe.database.entities.ScheduledItem
 import com.example.wardrobe.database.entities.WardrobeItem
 import com.example.wardrobe.R
+import com.example.wardrobe.filter_sort.groupWardrobeItemsByCategoryRecentlyWorn
 import com.example.wardrobe.storage.ImageStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -153,9 +154,7 @@ class AddOutfitViewModel @Inject constructor(
                     _uiState.update { it.copy(isLoading = false, errorMessage = appContext.getString(R.string.error_load_items, e.message ?: "")) }
                 }
                 .collect { items ->
-                    val groupedItems = items
-                        .sortedBy { it.lastWorn ?: Long.MIN_VALUE }
-                        .groupBy { it.category ?: "Uncategorized" }
+                    val groupedItems = groupWardrobeItemsByCategoryRecentlyWorn(items)
                     _uiState.update { it.copy(isLoading = false, itemsByCategory = groupedItems) }
                 }
         }

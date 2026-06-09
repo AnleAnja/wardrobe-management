@@ -41,7 +41,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
@@ -62,6 +62,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -201,22 +202,40 @@ fun AddItemForm(uiState: AddItemUiState, viewModel: AddItemViewModel) {
                 label = "PNG/JPG"
             )
             Text(
-                "Purchased Date",
+                "Purchased",
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(top = 2.dp)
             )
-            OutlinedTextField(
-                value = uiState.purchaseDate?.let {
-                    SimpleDateFormat("dd MMMM yyyy", Locale.getDefault()).format(Date(it))
-                } ?: "Select a date",
-                onValueChange = {},
-                placeholder = { Text("Select Date") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showDatePicker = true },
-                readOnly = true,
-                shape = MaterialTheme.shapes.medium
-            )
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = uiState.purchaseDate?.let {
+                        SimpleDateFormat("dd MMMM yyyy", Locale.getDefault()).format(Date(it))
+                    } ?: "",
+                    onValueChange = {},
+                    placeholder = { Text("Select a date") },
+                    readOnly = true,
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        Icon(
+                            Icons.Default.CalendarToday,
+                            contentDescription = "Select date"
+                        )
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    shape = MaterialTheme.shapes.medium
+                )
+                Spacer(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clickable { showDatePicker = true }
+                )
+            }
             Text(
                 "Category",
                 style = MaterialTheme.typography.labelLarge,

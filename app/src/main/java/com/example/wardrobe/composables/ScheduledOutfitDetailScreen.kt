@@ -146,7 +146,10 @@ fun ScheduledOutfitDetailsContent(
         outfit != null && scheduledOutfit != null -> {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()) {
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 16.dp)
+            ) {
                 ModernSectionCard(title = "Planned outfit") {
                     val dateAndTempString = buildString {
                         scheduledOutfit.date?.let { dateMillis ->
@@ -184,10 +187,7 @@ fun ScheduledOutfitDetailsContent(
                         }
                     }
                 }
-                ModernSectionCard(
-                    title = "Items",
-                    modifier = Modifier.verticalScroll(rememberScrollState())
-                ) {
+                ModernSectionCard(title = "Items") {
                     Column {
                         uiState.itemsInOutfit.forEach { item ->
                             OutfitItemRow(
