@@ -84,7 +84,9 @@ import com.example.wardrobe.composables.CalendarTopAppBar
 import com.example.wardrobe.composables.DetailsTopAppBar
 import com.example.wardrobe.composables.ItemDetailsContent
 import com.example.wardrobe.composables.OutfitDetailsContent
+import com.example.wardrobe.composables.OutfitGalleryModernContent
 import com.example.wardrobe.composables.ScheduledOutfitDetailsContent
+import com.example.wardrobe.composables.WardrobeGalleryModernContent
 import com.example.wardrobe.filter_sort.FilterChips
 import com.example.wardrobe.filter_sort.FilterDialog
 import com.example.wardrobe.filter_sort.OutfitFilters

@@ -297,10 +297,9 @@ fun ScheduledOutfitsList(
         title = "Outfits",
         subtitle = selectedDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL))
     ) {
-        val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)
         if (scheduledOutfits.isEmpty()) {
             Text(
-                text = "No outfits planned for ${selectedDate.format(formatter)}",
+                text = "No outfits planned for this date",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

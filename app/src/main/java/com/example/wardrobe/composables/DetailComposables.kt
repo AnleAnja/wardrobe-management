@@ -219,7 +219,7 @@ fun ItemDetailsContent(
                         ModernDetailRow(label = "Category", value = categoryDescription)
                         ModernDetailRow(label = "Seasons", value = item.seasons)
                         ModernDetailRow(label = "Rating", value = item.rating?.takeIf { it > 0 }?.let { "$it/5" })
-                        ModernDetailRow(label = "Price", value = item.price?.let { "$it €" })
+                        ModernDetailRow(label = "Price", value = item.price?.toPriceLabel())
                         ModernDetailRow(label = "Times worn", value = item.timesWorn.toString())
                         val daysText = when (uiState.daysSinceLastWear) {
                             null -> "Never worn"
@@ -314,7 +314,7 @@ fun OutfitDetailsContent(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    val imageUris = listOf(it.imageUriTeaser, it.imageUriCombined)
+                    val imageUris = listOf(outfit.imageUriTeaser, outfit.imageUriCombined)
                     val pagerState = rememberPagerState(pageCount = { imageUris.size })
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -639,8 +639,10 @@ fun ScheduledOutfitDetailsContent(
         outfit != null && scheduledOutfit != null -> {
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 ModernSectionCard(title = "Planned outfit") {
                     val dateAndTempString = buildString {
@@ -654,15 +656,6 @@ fun ScheduledOutfitDetailsContent(
                         scheduledOutfit.temperature?.let { temp ->
                             append("  ($temp°C)")
                         }
-                        Text(
-                            dateAndTempString,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-                        Spacer(Modifier.weight(1f))
-                        IconButton({ onNavigateToEdit(scheduledOutfit.id) }) { Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit") }
-                        IconButton({ showDeleteDialog = true }) { Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete") }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -673,6 +666,9 @@ fun ScheduledOutfitDetailsContent(
                         )
                         IconButton({ onNavigateToEdit(scheduledOutfit.id) }) {
                             Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit planned outfit")
+                        }
+                        IconButton({ showDeleteDialog = true }) {
+                            Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete planned outfit")
                         }
                     }
                 }
@@ -689,9 +685,7 @@ fun ScheduledOutfitDetailsContent(
 
                 Button(
                     onClick = { onNavigateToFullOutfitDetail(outfit.id) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large
                 ) {
                     Text("View Full Outfit Details")

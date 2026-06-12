@@ -46,7 +46,6 @@ import androidx.core.net.toUri
 import coil.compose.AsyncImage
 import com.example.wardrobe.database.entities.Outfit
 import com.example.wardrobe.database.entities.WardrobeItem
-import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -475,18 +474,14 @@ fun WardrobeItem.modernTitle(): String =
         .joinToString(" / ")
         .ifBlank { "Wardrobe item" }
 
-fun WardrobeItem.modernSummary(): String {
-    val priceText = price?.let {
-        NumberFormat.getCurrencyInstance(Locale.getDefault()).format(it)
-    }
-    return listOfNotNull(
+fun WardrobeItem.modernSummary(): String =
+    listOfNotNull(
         seasons?.takeIf { it.isNotBlank() },
         rating?.takeIf { it > 0 }?.let { "$it/5 rating" },
-        priceText,
+        price?.toPriceLabel(),
         "$timesWorn wears",
         "last worn ${lastWorn.toDateLabel("never")}"
     ).joinToString(" - ")
-}
 
 fun Outfit.modernTitle(): String = "Outfit #$id"
 
@@ -498,10 +493,18 @@ fun Outfit.modernSummary(): String =
         "last worn ${lastWorn.toDateLabel("never")}"
     ).joinToString(" - ")
 
-fun Long?.toDateLabel(emptyValue: String): String {
+// The app stores prices as plain numbers and assumes euros throughout.
+fun Double.toPriceLabel(locale: Locale = Locale.getDefault()): String =
+    String.format(locale, "%.2f €", this)
+
+fun Long?.toDateLabel(
+    emptyValue: String,
+    zoneId: ZoneId = ZoneId.systemDefault(),
+    locale: Locale = Locale.getDefault()
+): String {
     if (this == null) return emptyValue
-    val formatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
+    val formatter = DateTimeFormatter.ofPattern("MMM d, yyyy", locale)
     return Instant.ofEpochMilli(this)
-        .atZone(ZoneId.systemDefault())
+        .atZone(zoneId)
         .format(formatter)
 }

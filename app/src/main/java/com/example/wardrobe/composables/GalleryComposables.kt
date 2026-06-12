@@ -1,3 +1,5 @@
+package com.example.wardrobe.composables
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,11 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.wardrobe.composables.ModernEmptyState
-import com.example.wardrobe.composables.ModernErrorState
-import com.example.wardrobe.composables.ModernLoadingState
-import com.example.wardrobe.composables.ModernOutfitCard
-import com.example.wardrobe.composables.ModernWardrobeItemCard
+import com.example.wardrobe.database.entities.Outfit
+import com.example.wardrobe.database.entities.WardrobeItem
 import com.example.wardrobe.filter_sort.FilterChips
 import com.example.wardrobe.view_models.OutfitUiState
 import com.example.wardrobe.view_models.WardrobeUiState
@@ -29,14 +28,16 @@ fun WardrobeGalleryModernContent(
     onSortClick: () -> Unit,
     onFilterClick: () -> Unit,
     onRefreshClick: () -> Unit,
-    onItemClick: (com.example.wardrobe.database.entities.WardrobeItem) -> Unit,
+    onItemClick: (WardrobeItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        GallerySummaryHeader(
-            title = "${uiState.wardrobeItems.size} wardrobe pieces",
-            subtitle = wardrobeSummary(uiState)
-        )
+        if (!uiState.isLoading && uiState.errorMessage == null) {
+            GallerySummaryHeader(
+                title = "${uiState.wardrobeItems.size} wardrobe pieces",
+                subtitle = wardrobeSummary(uiState)
+            )
+        }
         FilterChips(
             onSortClick = onSortClick,
             onFilterClick = onFilterClick,
@@ -79,14 +80,16 @@ fun OutfitGalleryModernContent(
     onSortClick: () -> Unit,
     onFilterClick: () -> Unit,
     onRefreshClick: () -> Unit,
-    onOutfitClick: (com.example.wardrobe.database.entities.Outfit) -> Unit,
+    onOutfitClick: (Outfit) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        GallerySummaryHeader(
-            title = "${uiState.outfits.size} outfits",
-            subtitle = outfitSummary(uiState)
-        )
+        if (!uiState.isLoading && uiState.errorMessage == null) {
+            GallerySummaryHeader(
+                title = "${uiState.outfits.size} outfits",
+                subtitle = outfitSummary(uiState)
+            )
+        }
         FilterChips(
             onSortClick = onSortClick,
             onFilterClick = onFilterClick,
@@ -153,15 +156,19 @@ private fun GallerySummaryHeader(
     }
 }
 
-private fun wardrobeSummary(uiState: WardrobeUiState): String {
+internal fun wardrobeSummary(uiState: WardrobeUiState): String {
     val filterCount = uiState.currentFilters.selectedCategories.size + uiState.currentFilters.selectedSeasons.size
-    val filterText = if (filterCount == 0) "No active filters" else "$filterCount active filters"
-    return "$filterText - Sorted by ${uiState.currentSortOption.displayName}"
+    return "${activeFilterLabel(filterCount)} - Sorted by ${uiState.currentSortOption.displayName}"
 }
 
-private fun outfitSummary(uiState: OutfitUiState): String {
+internal fun outfitSummary(uiState: OutfitUiState): String {
     val filterCount = uiState.currentFilters.selectedSeasons.size + if (uiState.currentFilters.temperature != null) 1 else 0
-    val filterText = if (filterCount == 0) "No active filters" else "$filterCount active filters"
     val mode = if (uiState.isSelectionMode) "Choose an outfit for a date" else "Browse saved outfit combinations"
-    return "$filterText - $mode"
+    return "${activeFilterLabel(filterCount)} - $mode"
+}
+
+private fun activeFilterLabel(count: Int): String = when (count) {
+    0 -> "No active filters"
+    1 -> "1 active filter"
+    else -> "$count active filters"
 }
