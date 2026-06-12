@@ -442,8 +442,13 @@ fun OutfitSelectionDialog(
                 AnimatedVisibility(visible = selectedOutfit == null) {
                     Column {
                         Text("Filter", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Jahreszeit",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            seasons.forEach { season ->
+                            seasons.forEachIndexed { index, season ->
                                 FilterChip(
                                     selected = season in selectedSeasons,
                                     onClick = {
@@ -453,7 +458,7 @@ fun OutfitSelectionDialog(
                                             selectedSeasons + season
                                         }
                                     },
-                                    label = { Text(season) }
+                                    label = { Text("${index + 1}") }
                                 )
                             }
                         }

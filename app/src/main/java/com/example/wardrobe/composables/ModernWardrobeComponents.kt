@@ -39,11 +39,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
+import com.example.wardrobe.R
 import com.example.wardrobe.database.entities.Outfit
 import com.example.wardrobe.database.entities.WardrobeItem
 import java.text.NumberFormat
@@ -70,7 +72,7 @@ fun ModernErrorState(
 ) {
     ModernSectionCard(
         modifier = modifier.padding(16.dp),
-        title = "Something went wrong"
+        title = stringResource(R.string.error_something_went_wrong)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
@@ -80,7 +82,7 @@ fun ModernErrorState(
             )
             if (onRetry != null) {
                 Button(onClick = onRetry) {
-                    Text("Retry")
+                    Text(stringResource(R.string.action_retry))
                 }
             }
         }
@@ -205,7 +207,7 @@ fun ModernMediaCard(
     imageUri: String?,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    contentScale: ContentScale = ContentScale.Crop
+    contentScale: ContentScale = ContentScale.Fit
 ) {
     val context = LocalContext.current
     var hasPermission by remember(imageUri) { mutableStateOf(true) }
@@ -312,7 +314,7 @@ fun ModernOutfitCard(
         )
     ) {
         ModernMediaCard(
-            imageUri = outfit.imageUriTeaser,
+            imageUri = outfit.displayImageUri(),
             contentDescription = outfit.modernTitle(),
             modifier = Modifier
                 .fillMaxWidth()
@@ -365,7 +367,7 @@ fun ModernOutfitListItem(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             ModernMediaCard(
-                imageUri = outfit.imageUriTeaser,
+                imageUri = outfit.displayImageUri(),
                 contentDescription = outfit.modernTitle(),
                 modifier = Modifier.size(64.dp)
             )
@@ -489,6 +491,8 @@ fun WardrobeItem.modernSummary(): String {
 }
 
 fun Outfit.modernTitle(): String = "Outfit #$id"
+
+fun Outfit.displayImageUri(): String? = imageUriTeaser ?: imageUriCombined
 
 fun Outfit.modernSummary(): String =
     listOfNotNull(

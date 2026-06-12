@@ -1,3 +1,5 @@
+package com.example.wardrobe.composables
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,6 +14,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.wardrobe.composables.ModernEmptyState
@@ -20,6 +23,7 @@ import com.example.wardrobe.composables.ModernLoadingState
 import com.example.wardrobe.composables.ModernOutfitCard
 import com.example.wardrobe.composables.ModernWardrobeItemCard
 import com.example.wardrobe.filter_sort.FilterChips
+import com.example.wardrobe.R
 import com.example.wardrobe.view_models.OutfitUiState
 import com.example.wardrobe.view_models.WardrobeUiState
 
@@ -49,7 +53,7 @@ fun WardrobeGalleryModernContent(
                 onRetry = onRefreshClick
             )
             uiState.wardrobeItems.isEmpty() -> ModernEmptyState(
-                title = "No wardrobe items",
+                title = stringResource(R.string.empty_no_wardrobe_items),
                 body = "Add a first item or clear filters to see your closet."
             )
             else -> LazyVerticalGrid(
@@ -99,7 +103,7 @@ fun OutfitGalleryModernContent(
                 onRetry = onRefreshClick
             )
             uiState.outfits.isEmpty() -> ModernEmptyState(
-                title = "No outfits",
+                title = stringResource(R.string.empty_no_outfits),
                 body = "Create an outfit or adjust your filters."
             )
             else -> LazyVerticalGrid(

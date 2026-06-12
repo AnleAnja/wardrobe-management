@@ -1,3 +1,40 @@
 <resources>
     <string name="app_name">Wardrobe</string>
+
+    <!-- Navigation -->
+    <string name="nav_wardrobe">Wardrobe</string>
+    <string name="nav_calendar">Calendar</string>
+    <string name="nav_outfits">Outfits</string>
+    <string name="nav_inspiration">Inspiration</string>
+
+    <!-- Top app bar titles -->
+    <string name="title_wardrobe">Wardrobe</string>
+    <string name="title_calendar">Calendar</string>
+    <string name="title_outfits">Outfits</string>
+    <string name="title_item_details">Item Details</string>
+    <string name="title_outfit_details">Outfit Details</string>
+
+    <!-- Top bar actions -->
+    <string name="action_import_json">Import JSON</string>
+    <string name="action_export_json">Export JSON</string>
+    <string name="action_add">Add</string>
+
+    <!-- Errors -->
+    <string name="error_load_items">Failed to load items: %1$s</string>
+    <string name="error_could_not_read_file">Could not read file</string>
+    <string name="error_import_failed">Import failed: %1$s</string>
+    <string name="error_export_failed">Export failed: %1$s</string>
+    <string name="error_could_not_save_image">Could not save image</string>
+    <string name="error_category_required">Category is required</string>
+    <string name="error_save_item_failed">Failed to save item: %1$s</string>
+    <string name="error_outfit_not_found">Outfit not found</string>
+    <string name="error_save_outfit_failed">Failed to save outfit: %1$s</string>
+    <string name="error_item_not_found">Item not found</string>
+    <string name="error_something_went_wrong">Something went wrong</string>
+    <string name="error_unknown">An unknown error occurred.</string>
+
+    <!-- Gallery empty states -->
+    <string name="empty_no_wardrobe_items">No wardrobe items</string>
+    <string name="empty_no_outfits">No outfits</string>
+    <string name="action_retry">Retry</string>
 </resources>

@@ -1,5 +1,6 @@
 package com.example.wardrobe.view_models
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,7 +9,13 @@ import com.example.wardrobe.database.entities.Outfit
 import com.example.wardrobe.database.entities.ScheduledOutfit
 import com.example.wardrobe.filter_sort.OutfitFilters
 import com.example.wardrobe.filter_sort.OutfitSortOption
+import com.example.wardrobe.filter_sort.filterOutfitsBySeason
+import com.example.wardrobe.filter_sort.filterOutfitsByTemperature
+import com.example.wardrobe.filter_sort.sortOutfits
+import com.example.wardrobe.R
+import com.example.wardrobe.navigation.NavigationEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,6 +51,7 @@ sealed class OutfitScreenEvent {
 
 @HiltViewModel
 class OutfitsViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val repository: OutfitRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -57,6 +65,9 @@ class OutfitsViewModel @Inject constructor(
     private val _navigationEvent = MutableStateFlow<NavigationEvent?>(null)
     val navigationEvent: StateFlow<NavigationEvent?> = _navigationEvent.asStateFlow()
 
+    private val _sortOption = MutableStateFlow(OutfitSortOption.RECENTLY_WORN)
+    private val _filters = MutableStateFlow(OutfitFilters())
+
     private val allOutfitsFlow = repository.getAll()
     private val allScheduledOutfitsFlow = repository.getAllScheduled()
 
@@ -69,81 +80,29 @@ class OutfitsViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            viewModelScope.launch {
-                combine(allOutfitsFlow, allScheduledOutfitsFlow, _uiState) { allOutfits, allScheduled, state ->
-                    val filteredByTemp = applyTemperatureFilter(allOutfits, allScheduled, state.currentFilters.temperature)
-                    val filteredBySeason = applySeasonFilter(filteredByTemp, state.currentFilters)
-                    val sortedOutfits = applySorting(filteredBySeason, state.currentSortOption)
-                    state.copy(
-                        outfits = sortedOutfits
+            combine(allOutfitsFlow, allScheduledOutfitsFlow, _sortOption, _filters) { allOutfits, allScheduled, sort, filters ->
+                val filteredByTemp = filterOutfitsByTemperature(allOutfits, allScheduled, filters.temperature)
+                val filteredBySeason = filterOutfitsBySeason(filteredByTemp, filters)
+                sortOutfits(filteredBySeason, sort) to (sort to filters)
+            }.catch { e ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = appContext.getString(R.string.error_load_items, e.message ?: "")
                     )
-                }.catch { e ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = "Failed to load items: ${e.message}"
-                        )
-                    }
-                }.collect { newState ->
-                    _uiState.update {
-                        newState.copy(isLoading = false, errorMessage = null)
-                    }
+                }
+            }.collect { (sortedOutfits, sortAndFilters) ->
+                val (sort, filters) = sortAndFilters
+                _uiState.update {
+                    it.copy(
+                        outfits = sortedOutfits,
+                        currentSortOption = sort,
+                        currentFilters = filters,
+                        isLoading = false,
+                        errorMessage = null
+                    )
                 }
             }
-        }
-    }
-
-    private fun applyTemperatureFilter(
-        outfits: List<Outfit>,
-        scheduledOutfits: List<ScheduledOutfit>,
-        temperature: Int?
-    ): List<Outfit> {
-        if (temperature == null) return outfits
-        val outfitTempRanges = scheduledOutfits
-            .groupBy { it.outfitId }
-            .mapValues { (_, scheduledList) ->
-                val temps = scheduledList.mapNotNull { it.temperature }
-                if (temps.isEmpty()) null else temps.minOrNull() to temps.maxOrNull()
-            }
-
-        return outfits.filter { outfit ->
-            val tempRange = outfitTempRanges[outfit.id]
-            if (tempRange != null && tempRange.first != null && tempRange.second != null) {
-                temperature in tempRange.first!!..tempRange.second!!
-            } else {
-                false
-            }
-        }
-    }
-
-    private fun applySeasonFilter(
-        outfits: List<Outfit>,
-        filters: OutfitFilters
-    ): List<Outfit> {
-        var filteredList = outfits
-
-        if (filters.selectedSeasons.isNotEmpty()) {
-            filteredList = filteredList.filter { outfit ->
-                val outfitsSeasons = outfit.seasons?.split(',')?.map { it.trim() } ?: emptyList()
-                filters.selectedSeasons.any { selectedSeason -> outfitsSeasons.contains(selectedSeason) }
-            }
-        }
-
-        return filteredList
-    }
-
-    private fun applySorting(
-        outfits: List<Outfit>,
-        sortOption: OutfitSortOption?
-    ): List<Outfit> {
-        return when (sortOption) {
-            OutfitSortOption.MOST_WORN -> outfits.sortedByDescending { it.timesWorn }
-            OutfitSortOption.LEAST_WORN -> outfits.sortedBy { it.timesWorn }
-            OutfitSortOption.RECENTLY_WORN -> outfits.sortedByDescending { it.lastWorn }
-            OutfitSortOption.LEAST_RECENTLY_WORN -> outfits.sortedBy { it.lastWorn }
-            OutfitSortOption.HIGHEST_RATING -> outfits.sortedByDescending { it.rating }
-            OutfitSortOption.SEASON -> outfits.sortedBy { it.seasons ?: "" }
-            null -> outfits
         }
     }
 
@@ -153,13 +112,13 @@ class OutfitsViewModel @Inject constructor(
                 _navigationEvent.value = NavigationEvent.NavigateToAddOutfit
             }
             is OutfitScreenEvent.ApplyFilters -> {
-                _uiState.update { it.copy(currentFilters = event.filters) }
+                _filters.update { event.filters }
             }
             is OutfitScreenEvent.ApplySortOption -> {
-                _uiState.update { it.copy(currentSortOption = event.sortOption) }
+                _sortOption.update { event.sortOption }
             }
             is OutfitScreenEvent.ClearFilters -> {
-                _uiState.update { it.copy(currentFilters = OutfitFilters()) }
+                _filters.update { OutfitFilters() }
             }
             is OutfitScreenEvent.OutfitClicked -> {
                 _navigationEvent.value = NavigationEvent.NavigateToOutfitDetail(event.outfit)

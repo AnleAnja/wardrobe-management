@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -96,192 +97,6 @@ import java.time.format.TextStyle
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DetailsTopAppBar(
-    title: String,
-    onNavigateBack: () -> Unit,
-    onNavigateToEdit: (Int) -> Unit,
-    onDeleteClick: (Int) -> Unit,
-    id: Int?
-) {
-    var menuExpanded by remember { mutableStateOf(false) }
-    var showDialog by remember { mutableStateOf(false) }
-
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showDialog = false
-            },
-            title = {
-                Text(text = "Bist du sicher?")
-            },
-            text = {
-                Text("Wenn du das Item löschst, kannst du es nicht wiederherstellen.")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDialog = false
-                        id?.let { id ->
-                            onDeleteClick(id)
-                        }
-                    }
-                ) {
-                    Text("Ja")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showDialog = false
-                    }
-                ) {
-                    Text("Nein")
-                }
-            }
-        )
-    }
-
-    TopAppBar(
-        title = { Text(title) },
-        navigationIcon = {
-            IconButton(onClick = onNavigateBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Navigate back"
-                )
-            }
-        },
-        actions = {
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "More options"
-                    )
-                }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Edit") },
-                        onClick = {
-                            id?.let { onNavigateToEdit(it) }
-                            menuExpanded = false
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Delete") },
-                        onClick = {
-                            showDialog = true
-                            menuExpanded = false
-                        }
-                    )
-                }
-            }
-        }
-    )
-}
-
-@Composable
-fun ItemDetailsContent(
-    uiState: ItemDetailUiState,
-    onOutfitClick: (Int) -> Unit
-) {
-    when {
-        uiState.isLoading -> ModernLoadingState()
-
-        uiState.errorMessage != null -> ModernErrorState(message = uiState.errorMessage)
-
-        else -> {
-            uiState.item?.let { item ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    ModernMediaCard(
-                        imageUri = item.imageUri,
-                        contentDescription = item.modernTitle(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(0.75f),
-                        contentScale = ContentScale.Fit
-                    )
-                    ModernSectionCard(title = "Details") {
-                        val categoryDescription = listOfNotNull(item.category, item.subcategory)
-                            .filter { it.isNotBlank() }
-                            .joinToString(" / ")
-                        ModernDetailRow(label = "Category", value = categoryDescription)
-                        ModernDetailRow(label = "Seasons", value = item.seasons)
-                        ModernDetailRow(label = "Rating", value = item.rating?.takeIf { it > 0 }?.let { "$it/5" })
-                        ModernDetailRow(label = "Price", value = item.price?.let { "$it €" })
-                        ModernDetailRow(label = "Times worn", value = item.timesWorn.toString())
-                        val daysText = when (uiState.daysSinceLastWear) {
-                            null -> "Never worn"
-                            0 -> "Today"
-                            1 -> "Yesterday"
-                            else -> "${uiState.daysSinceLastWear} days ago"
-                        }
-                        ModernDetailRow(label = "Last worn", value = daysText)
-                        val formattedDate = item.purchaseDate?.let {
-                            SimpleDateFormat("dd MMMM yyyy", Locale.getDefault()).format(Date(it))
-                        } ?: "Not set"
-                        ModernDetailRow(label = "Purchase date", value = formattedDate)
-                    }
-                    if (uiState.outfits.isNotEmpty()) {
-                        Column {
-                            Text(
-                                "Part of Outfits",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Card(shape = RoundedCornerShape(12.dp)) {
-                                Column {
-                                    uiState.outfits.forEach { outfit ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable { onOutfitClick(outfit.id) }
-                                                .padding(16.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                                        ) {
-                                            AsyncImage(
-                                                model = outfit.imageUriTeaser,
-                                                contentDescription = "Outfit image",
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier
-                                                    .size(48.dp)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                            )
-                                            Text(
-                                                text = "Outfit ID: ${outfit.id}",
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Filled.ChevronRight,
-                                                contentDescription = "View outfit details",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } ?: ModernEmptyState("No item found", "This item is no longer available.")
-        }
-    }
-}
 
 @Composable
 fun OutfitDetailsContent(
@@ -314,45 +129,20 @@ fun OutfitDetailsContent(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    val imageUris = listOf(it.imageUriTeaser, it.imageUriCombined)
-                    val pagerState = rememberPagerState(pageCount = { imageUris.size })
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp)
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
                     ) {
-                        HorizontalPager(
-                            state = pagerState,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(1f)
-                        ) { page ->
-                            ModernMediaCard(
-                                imageUri = imageUris[page],
-                                contentDescription = "Outfit image ${page + 1}",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            repeat(pagerState.pageCount) { iteration ->
-                                val color = if (pagerState.currentPage == iteration) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .padding(4.dp)
-                                        .clip(CircleShape)
-                                        .background(color)
-                                        .size(8.dp)
-                                )
-                            }
-                        }
-
+                        ModernMediaCard(
+                            imageUri = outfit.displayImageUri(),
+                            contentDescription = "Outfit image",
+                            modifier = Modifier.fillMaxWidth(),
+                            contentScale = ContentScale.Fit
+                        )
                     }
                     ModernSectionCard(
                         title = "Items",
@@ -410,13 +200,12 @@ fun OutfitDetailsContent(
 }
 
 @Composable
-private fun OutfitItemRow(
+internal fun OutfitItemRow(
     item: WardrobeItem,
     onClick: () -> Unit
 ) {
     ModernWardrobeItemListItem(item = item, onClick = onClick)
 }
-
 @Composable
 fun ScheduleOutfitDialog(
     onDateSelected: (date: LocalDate, temperature: Int?) -> Unit,
@@ -592,171 +381,3 @@ fun ScheduleOutfitDialog(
     )
 }
 
-@Composable
-fun ScheduledOutfitDetailsContent(
-    uiState: OutfitDetailUiState,
-    onNavigateToFullOutfitDetail: (Int) -> Unit,
-    onItemClick: (Int) -> Unit,
-    onNavigateToEdit: (Int) -> Unit,
-    onDelete: (Int) -> Unit
-) {
-    val outfit = uiState.outfit
-    val scheduledOutfit = uiState.scheduledOutfit
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    if (showDeleteDialog && scheduledOutfit != null) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = {
-                Text(text = "Bist du sicher?")
-            },
-            text = {
-                Text("Wenn du das geplante Outfit löschst, kannst du es nicht wiederherstellen.")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDelete(scheduledOutfit.id)
-                    }
-                ) {
-                    Text("Ja")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                    }
-                ) {
-                    Text("Nein")
-                }
-            }
-        )
-    }
-    when {
-        uiState.isLoading -> ModernLoadingState()
-        uiState.errorMessage != null -> ModernErrorState(message = uiState.errorMessage)
-        outfit != null && scheduledOutfit != null -> {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                ModernSectionCard(title = "Planned outfit") {
-                    val dateAndTempString = buildString {
-                        scheduledOutfit.date?.let { dateMillis ->
-                            val date = Instant.ofEpochMilli(dateMillis)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-                            val formatter = DateTimeFormatter.ofPattern("dd/MM")
-                            append(date.format(formatter))
-                        } ?: append("No Date")
-                        scheduledOutfit.temperature?.let { temp ->
-                            append("  ($temp°C)")
-                        }
-                        Text(
-                            dateAndTempString,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-                        Spacer(Modifier.weight(1f))
-                        IconButton({ onNavigateToEdit(scheduledOutfit.id) }) { Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit") }
-                        IconButton({ showDeleteDialog = true }) { Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete") }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            dateAndTempString,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton({ onNavigateToEdit(scheduledOutfit.id) }) {
-                            Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit planned outfit")
-                        }
-                    }
-                }
-                ModernSectionCard(title = "Items") {
-                    Column {
-                        uiState.itemsInOutfit.forEach { item ->
-                            OutfitItemRow(
-                                item = item,
-                                onClick = { onItemClick(item.id) }
-                            )
-                        }
-                    }
-                }
-
-                Button(
-                    onClick = { onNavigateToFullOutfitDetail(outfit.id) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    shape = MaterialTheme.shapes.large
-                ) {
-                    Text("View Full Outfit Details")
-                }
-            }
-        }
-        else -> ModernEmptyState("No scheduled outfit found", "This planned outfit is no longer available.")
-    }
-}
-
-@Composable
-fun AddScheduledItemScreen(
-    onNavigateBack: () -> Unit,
-) {
-    val viewModel: AddOutfitViewModel = hiltViewModel()
-    val uiState by viewModel.uiState.collectAsState()
-    LaunchedEffect(uiState.isSuccess) {
-        if (uiState.isSuccess) {
-            onNavigateBack()
-            viewModel.onEvent(AddOutfitEvent.ClearSuccess)
-        }
-    }
-
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .padding(16.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            ItemSelector(
-                itemsByCategory = uiState.itemsByCategory,
-                selectedItemIds = uiState.selectedItemIds,
-                lockedItemIds = uiState.lockedItemIds,
-                onItemToggle = { viewModel.onEvent(AddOutfitEvent.ItemsChanged(it)) }
-            )
-        }
-
-        uiState.errorMessage?.let { error ->
-            Text(
-                uiState.errorMessage ?: "An unknown error occurred.",
-                color = MaterialTheme.colorScheme.error,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(16.dp)
-            )
-        }
-
-        Button(
-            onClick = { viewModel.onEvent(AddOutfitEvent.SaveOutfit) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            shape = RoundedCornerShape(8.dp),
-            enabled = uiState.selectedItemIds.isNotEmpty() && !uiState.isLoading
-        ) {
-            if (uiState.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Text("Save Outfit", modifier = Modifier.padding(vertical = 8.dp))
-            }
-        }
-    }
-}

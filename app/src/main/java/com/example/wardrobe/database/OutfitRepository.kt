@@ -13,6 +13,10 @@ import com.example.wardrobe.database.entities.ScheduledOutfit
 import com.example.wardrobe.database.entities.WardrobeItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 
 class OutfitRepository @Inject constructor(
@@ -47,28 +51,25 @@ class OutfitRepository @Inject constructor(
     }
 
     suspend fun insertScheduledOutfit(scheduledOutfit: ScheduledOutfit) {
-        scheduledOutfitDao.insertOutfit(scheduledOutfit)
+        val insertedId = scheduledOutfitDao.insertOutfit(scheduledOutfit).toInt()
+        val wearTimestamp = resolveWearTimestamp(scheduledOutfit.date) ?: return
 
-        // Only count this as an actual wear when the date is today or in the past;
-        // future schedules are plans, not wears.
-        val date = scheduledOutfit.date
-        val isPastOrToday = date != null && date <= System.currentTimeMillis()
-        if (!isPastOrToday) return
-
-        val outfit = outfitDao.getById(scheduledOutfit.outfitId).first()
+        val outfit = outfitDao.getById(scheduledOutfit.outfitId).firstOrNull()
         outfit?.let {
-            outfitDao.updateOutfit(it.copy(
-                timesWorn = it.timesWorn + 1,
-                lastWorn = if (date > (it.lastWorn ?: 0L)) date else it.lastWorn
-            ))
+            outfitDao.updateOutfit(
+                it.copy(
+                    timesWorn = it.timesWorn + 1,
+                    lastWorn = if (wearTimestamp > (it.lastWorn ?: 0L)) wearTimestamp else it.lastWorn
+                )
+            )
         }
-        val items = outfitItemDao.getItemsForOutfit(scheduledOutfit.outfitId).first()
-        items.forEach {
-            wardrobeItemDao.updateItem(it.copy(
-                timesWorn = it.timesWorn + 1,
-                lastWorn = if (date > (it.lastWorn ?: 0L)) date else it.lastWorn
-            ))
-        }
+
+        val baseItems = outfitItemDao.getItemsForOutfit(scheduledOutfit.outfitId).first()
+        val scheduledItems = scheduledItemDao.getItemsForScheduledOutfit(insertedId).first()
+        applyWearStatsToItems(
+            (baseItems + scheduledItems).distinctBy { it.id },
+            wearTimestamp
+        )
     }
 
     suspend fun insertOutfitItem(item: OutfitItem) {
@@ -97,6 +98,43 @@ class OutfitRepository @Inject constructor(
 
     suspend fun replaceScheduledItems(scheduledOutfitId: Int, newItemIds: List<Int>) {
         scheduledItemDao.replaceAllForScheduledOutfit(scheduledOutfitId, newItemIds)
+
+        val scheduled = scheduledOutfitDao.getById(scheduledOutfitId).firstOrNull() ?: return
+        val wearTimestamp = resolveWearTimestamp(scheduled.date) ?: return
+
+        val baseItemIds = outfitItemDao.getItemsForOutfit(scheduled.outfitId)
+            .first()
+            .map { it.id }
+            .toSet()
+        val scheduledOnlyItems = newItemIds
+            .filter { it !in baseItemIds }
+            .mapNotNull { wardrobeItemDao.getById(it).firstOrNull() }
+        applyWearStatsToItems(scheduledOnlyItems, wearTimestamp)
+    }
+
+    private fun resolveWearTimestamp(scheduledDateMillis: Long?): Long? {
+        if (scheduledDateMillis == null) return null
+        val zone = ZoneId.systemDefault()
+        val scheduledDate = Instant.ofEpochMilli(scheduledDateMillis).atZone(zone).toLocalDate()
+        val today = LocalDate.now(zone)
+        if (scheduledDate.isAfter(today)) return null
+
+        return if (scheduledDate == today) {
+            System.currentTimeMillis()
+        } else {
+            scheduledDate.atTime(23, 59, 59).atZone(zone).toInstant().toEpochMilli()
+        }
+    }
+
+    private suspend fun applyWearStatsToItems(items: List<WardrobeItem>, wearTimestamp: Long) {
+        items.forEach { item ->
+            wardrobeItemDao.updateItem(
+                item.copy(
+                    timesWorn = item.timesWorn + 1,
+                    lastWorn = if (wearTimestamp > (item.lastWorn ?: 0L)) wearTimestamp else item.lastWorn
+                )
+            )
+        }
     }
 
     suspend fun replaceOutfitItems(outfitId: Int, newItemIds: Set<Int>) {
