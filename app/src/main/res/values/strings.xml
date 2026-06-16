@@ -37,4 +37,9 @@
     <string name="empty_no_wardrobe_items">No wardrobe items</string>
     <string name="empty_no_outfits">No outfits</string>
     <string name="action_retry">Retry</string>
+
+    <!-- Add outfit -->
+    <string name="upload_outfit_photo">Upload a photo</string>
+    <string name="outfit_image_or_canvas_hint">Arrange items on the canvas, or upload your own photo.</string>
+    <string name="remove_outfit_image">Remove image</string>
 </resources>

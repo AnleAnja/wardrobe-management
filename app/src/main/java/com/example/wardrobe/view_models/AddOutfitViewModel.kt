@@ -2,6 +2,7 @@ package com.example.wardrobe.view_models
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -44,6 +45,7 @@ data class AddOutfitUiState(
 
 sealed class AddOutfitEvent {
     data object RemoveImage : AddOutfitEvent()
+    data class ImageUriChanged(val uri: Uri?) : AddOutfitEvent()
     data class ItemsChanged(val itemId: Int) : AddOutfitEvent()
     data class SeasonsChanged(val seasons: String) : AddOutfitEvent()
     data class RatingChanged(val rating: Int) : AddOutfitEvent()
@@ -191,15 +193,38 @@ class AddOutfitViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isSuccess = false)
             }
             AddOutfitEvent.RemoveImage -> {
-                _uiState.update { currentState ->
-                    val current = currentState.imageUri
-                    if (current != null && current in sessionPaths) {
-                        imageStorage.deleteImage(current)
-                        sessionPaths.remove(current)
-                    }
-                    currentState.copy(imageUri = null)
-                }
+                handleImagePicked(null)
             }
+            is AddOutfitEvent.ImageUriChanged -> {
+                handleImagePicked(event.uri)
+            }
+        }
+    }
+
+    private fun handleImagePicked(source: Uri?) {
+        viewModelScope.launch {
+            val current = _uiState.value.imageUri
+            if (source == null) {
+                if (current != null && current in sessionPaths) {
+                    imageStorage.deleteImage(current)
+                    sessionPaths.remove(current)
+                }
+                _uiState.update { it.copy(imageUri = null) }
+                return@launch
+            }
+            val newPath = imageStorage.saveImage(source)
+            if (newPath == null) {
+                _uiState.update {
+                    it.copy(errorMessage = appContext.getString(R.string.error_could_not_save_image))
+                }
+                return@launch
+            }
+            if (current != null && current in sessionPaths) {
+                imageStorage.deleteImage(current)
+                sessionPaths.remove(current)
+            }
+            sessionPaths.add(newPath)
+            _uiState.update { it.copy(imageUri = newPath) }
         }
     }
 
