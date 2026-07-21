@@ -9,6 +9,10 @@
 .cursor/
 Docs/
 local.properties
+keystore.properties
+*.jks
+*.keystore
+website_logo_source.png
 .DS_Store
 build/
 captures/

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,18 +8,55 @@ plugins {
     alias(libs.plugins.compose)
 }
 
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+}
+
+val launchConfig = Properties().apply {
+    rootProject.file("launch-config.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
+}
+
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
+}
+
 android {
-    namespace = "com.example.wardrobe"
+    namespace = "com.anleanja.wardrobe"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.wardrobe"
+        applicationId = launchConfig.getProperty("applicationId", "com.anleanja.wardrobe")
         minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String",
+            "PRIVACY_POLICY_URL",
+            "\"${launchConfig.getProperty("privacyPolicyUrl", "https://anleanja.github.io/wardrobe-management/privacy.html")}\""
+        )
+        buildConfigField(
+            "String",
+            "INSPIRATION_URL",
+            "\"${launchConfig.getProperty("inspirationUrl", "https://de.pinterest.com/aja0159/outfits/")}\""
+        )
+    }
+
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
     }
 
     buildFeatures {
@@ -33,6 +72,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
@@ -111,4 +153,7 @@ dependencies {
     implementation(libs.androidx.window.core)
 
     implementation(libs.accompanist.adaptive)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
 }
