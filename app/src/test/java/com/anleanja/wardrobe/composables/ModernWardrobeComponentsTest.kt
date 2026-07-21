@@ -82,4 +82,29 @@ class ModernWardrobeComponentsTest {
             epochMillis.toDateLabel("never", zoneId = ZoneOffset.UTC, locale = Locale.ENGLISH)
         )
     }
+
+    @Test
+    fun `outfit display image prefers teaser over combined`() {
+        val outfit = Outfit(
+            id = 1,
+            imageUriTeaser = "file:///teaser.jpg",
+            imageUriCombined = "file:///combined.jpg"
+        )
+        assertEquals("file:///teaser.jpg", outfit.displayImageUri())
+    }
+
+    @Test
+    fun `outfit display image falls back to combined`() {
+        val outfit = Outfit(
+            id = 1,
+            imageUriTeaser = null,
+            imageUriCombined = "file:///combined.jpg"
+        )
+        assertEquals("file:///combined.jpg", outfit.displayImageUri())
+    }
+
+    @Test
+    fun `outfit display image returns null when both missing`() {
+        assertEquals(null, Outfit(id = 1).displayImageUri())
+    }
 }
