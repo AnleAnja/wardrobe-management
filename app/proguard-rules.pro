@@ -13,8 +13,8 @@
 
 # Gson hits these via reflection during JSON import/export. Keep their
 # fields so member names match the on-disk JSON.
--keep class com.example.wardrobe.json_parser.WardrobeImport { *; }
--keep class com.example.wardrobe.json_parser.**Json { *; }
+-keep class com.anleanja.wardrobe.json_parser.WardrobeImport { *; }
+-keep class com.anleanja.wardrobe.json_parser.**Json { *; }
 
 # Gson TypeToken anonymous subclasses (used by Converters.kt for List<String?>).
 -keep class * extends com.google.gson.reflect.TypeToken
