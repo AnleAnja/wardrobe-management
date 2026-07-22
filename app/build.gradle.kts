@@ -44,7 +44,7 @@ android {
         buildConfigField(
             "String",
             "INSPIRATION_URL",
-            "\"${launchConfig.getProperty("inspirationUrl", "https://de.pinterest.com/aja0159/outfits/")}\""
+            "\"${launchConfig.getProperty("inspirationUrl", "https://de.pinterest.com/")}\""
         )
     }
 
