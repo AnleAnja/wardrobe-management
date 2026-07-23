@@ -67,7 +67,7 @@ uiText = "1.9.2"
 roomKtx = "2.8.1"
 foundation = "1.9.3"
 googleServices = "4.4.2"
-firebaseCrashlyticsGradle = "3.0.3"
+firebaseCrashlyticsGradle = "3.0.7"
 firebaseBom = "33.7.0"
 
 [libraries]
