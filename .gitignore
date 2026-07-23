@@ -7,7 +7,7 @@
 .gradle/
 .navigation/
 .cursor/
-Docs/
+guidelines/
 local.properties
 keystore.properties
 *.jks
