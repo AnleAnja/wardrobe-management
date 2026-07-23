@@ -38,6 +38,7 @@ Requires Android Studio, JDK 11+, SDK 36.
 **Release APK** (for maintainers): create a keystore, copy `keystore.properties.example` → `keystore.properties`, then `./gradlew assembleRelease`. Output: `app/build/outputs/apk/release/app-release.apk`. Bump version in [`launch-config.properties`](launch-config.properties) before tagging a release.
 
 Developer notes: [DATABASE.md](DATABASE.md) (Room migrations), [`launch-config.properties`](launch-config.properties) (app ID, version, URLs).
+See [CHANGELOG.md](CHANGELOG.md) and [docs/SMOKE_TEST.md](docs/SMOKE_TEST.md) before releasing.
 
 ## License
 
