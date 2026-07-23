@@ -1,0 +1,25 @@
+name: Bug Report
+description: Something is broken
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version (About screen)
+      placeholder: "1.0.0 (1)"
+  - type: input
+    id: android
+    attributes:
+      label: Android version
+      placeholder: "14"
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
