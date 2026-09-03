@@ -1,12 +1,14 @@
 package com.anleanja.wardrobe.composables
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.MaterialTheme
@@ -16,12 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.anleanja.wardrobe.composables.ModernEmptyState
-import com.anleanja.wardrobe.composables.ModernErrorState
-import com.anleanja.wardrobe.composables.ModernLoadingState
-import com.anleanja.wardrobe.composables.ModernOutfitCard
-import com.anleanja.wardrobe.composables.ModernWardrobeItemCard
 import com.anleanja.wardrobe.filter_sort.FilterChips
 import com.anleanja.wardrobe.R
 import com.anleanja.wardrobe.view_models.OutfitUiState
@@ -56,13 +54,7 @@ fun WardrobeGalleryModernContent(
                 title = stringResource(R.string.empty_no_wardrobe_items),
                 body = "Add a first item or clear filters to see your closet."
             )
-            else -> LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 160.dp),
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-            ) {
+            else -> GalleryItemsGrid {
                 items(
                     items = uiState.wardrobeItems,
                     key = { item -> item.id }
@@ -106,13 +98,7 @@ fun OutfitGalleryModernContent(
                 title = stringResource(R.string.empty_no_outfits),
                 body = "Create an outfit or adjust your filters."
             )
-            else -> LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 170.dp),
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-            ) {
+            else -> GalleryItemsGrid {
                 items(
                     items = uiState.outfits,
                     key = { outfit -> outfit.id }
@@ -172,4 +158,31 @@ private fun activeFilterLabel(count: Int): String = when (count) {
     0 -> "No active filters"
     1 -> "1 active filter"
     else -> "$count active filters"
+}
+
+@Composable
+private fun GalleryItemsGrid(
+    modifier: Modifier = Modifier,
+    content: LazyGridScope.() -> Unit
+) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(galleryColumnCount(maxWidth)),
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            content = content
+        )
+    }
+}
+
+/**
+ * Phones stay on two columns so a typical ~360dp screen does not collapse to a
+ * single-card list. Wider windows pick up extra columns.
+ */
+internal fun galleryColumnCount(availableWidth: Dp): Int = when {
+    availableWidth >= 840.dp -> 4
+    availableWidth >= 600.dp -> 3
+    else -> 2
 }

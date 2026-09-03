@@ -1,5 +1,6 @@
 package com.anleanja.wardrobe.composables
 
+import androidx.compose.ui.unit.dp
 import com.anleanja.wardrobe.filter_sort.OutfitFilters
 import com.anleanja.wardrobe.filter_sort.WardrobeFilters
 import com.anleanja.wardrobe.filter_sort.WardrobeSortOption
@@ -50,5 +51,23 @@ class GallerySummaryTest {
             isSelectionMode = true
         )
         assertEquals("2 active filters - Choose an outfit for a date", outfitSummary(state))
+    }
+
+    @Test
+    fun `gallery stays two columns on compact phone widths`() {
+        assertEquals(2, galleryColumnCount(360.dp))
+        assertEquals(2, galleryColumnCount(411.dp))
+        assertEquals(2, galleryColumnCount(599.dp))
+    }
+
+    @Test
+    fun `gallery uses three columns on medium widths`() {
+        assertEquals(3, galleryColumnCount(600.dp))
+        assertEquals(3, galleryColumnCount(839.dp))
+    }
+
+    @Test
+    fun `gallery uses four columns on expanded widths`() {
+        assertEquals(4, galleryColumnCount(840.dp))
     }
 }
