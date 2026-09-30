@@ -35,7 +35,13 @@ class WardrobeExporter @Inject constructor(private val database: AppDatabase) {
 
             val jsonString = gson.toJson(exportData)
 
-            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+            val output = context.contentResolver.openOutputStream(uri)
+            if (output == null) {
+                return Result.failure(
+                    IllegalStateException(context.getString(R.string.error_could_not_write_file))
+                )
+            }
+            output.use { outputStream ->
                 outputStream.write(jsonString.toByteArray())
             }
 

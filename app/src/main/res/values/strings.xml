@@ -22,6 +22,7 @@
     <!-- Errors -->
     <string name="error_load_items">Failed to load items: %1$s</string>
     <string name="error_could_not_read_file">Could not read file</string>
+    <string name="error_could_not_write_file">Could not write file</string>
     <string name="error_import_failed">Import failed: %1$s</string>
     <string name="error_export_failed">Export failed: %1$s</string>
     <string name="error_could_not_save_image">Could not save image</string>
