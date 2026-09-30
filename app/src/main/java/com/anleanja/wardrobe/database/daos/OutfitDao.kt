@@ -33,4 +33,13 @@ interface OutfitDao {
 
     @Query("DELETE FROM OUTFITS WHERE id = :id")
     suspend fun deleteOutfit(id: Int)
+
+    @Query("DELETE FROM outfits")
+    suspend fun deleteAll()
+
+    @Query("SELECT image_uri_teaser FROM outfits")
+    suspend fun teaserUris(): List<String>
+
+    @Query("SELECT image_uri_combined FROM outfits")
+    suspend fun combinedUris(): List<String>
 }

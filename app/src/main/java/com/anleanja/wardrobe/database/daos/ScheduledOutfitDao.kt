@@ -25,6 +25,9 @@ interface ScheduledOutfitDao {
     @Query("DELETE FROM SCHEDULED_OUTFITS WHERE id = :id")
     suspend fun deleteOutfit(id: Int)
 
+    @Query("DELETE FROM scheduled_outfits")
+    suspend fun deleteAll()
+
     @Query("SELECT * FROM SCHEDULED_OUTFITS WHERE outfit_id = :outfitId")
     fun getAllForOutfit(outfitId: Int): Flow<List<ScheduledOutfit>>
 }

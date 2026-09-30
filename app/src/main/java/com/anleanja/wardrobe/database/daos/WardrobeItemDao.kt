@@ -25,4 +25,10 @@ interface WardrobeItemDao {
 
     @Query("DELETE FROM wardrobe_items WHERE id = :id")
     suspend fun deleteItem(id: Int)
+
+    @Query("DELETE FROM wardrobe_items")
+    suspend fun deleteAll()
+
+    @Query("SELECT image_uri FROM wardrobe_items")
+    suspend fun imageUris(): List<String>
 }

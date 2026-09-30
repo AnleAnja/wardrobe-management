@@ -12,13 +12,14 @@ import com.anleanja.wardrobe.filter_sort.extractAvailableCategories
 import com.anleanja.wardrobe.filter_sort.filterWardrobeItems
 import com.anleanja.wardrobe.filter_sort.sortWardrobeItems
 import com.anleanja.wardrobe.R
+import com.anleanja.wardrobe.json_parser.BackupFormatException
+import com.anleanja.wardrobe.json_parser.ImportMode
 import com.anleanja.wardrobe.json_parser.WardrobeExporter
 import com.anleanja.wardrobe.json_parser.WardrobeImporter
 import com.anleanja.wardrobe.navigation.NavigationEvent
 import com.anleanja.wardrobe.storage.ImageStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +28,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class WardrobeUiState(
@@ -42,8 +42,12 @@ data class WardrobeUiState(
 )
 
 sealed class WardrobeScreenEvent {
-    data class ImportJson(val context: Context, val uri: Uri) : WardrobeScreenEvent()
-    data class ExportJson(val context: Context, val uri: Uri) : WardrobeScreenEvent()
+    data class ImportBackup(
+        val context: Context,
+        val uri: Uri,
+        val mode: ImportMode,
+    ) : WardrobeScreenEvent()
+    data class ExportBackup(val context: Context, val uri: Uri) : WardrobeScreenEvent()
     data object AddItemClicked : WardrobeScreenEvent()
     data class ItemClicked(val item: WardrobeItem) : WardrobeScreenEvent()
     data object RefreshRequested : WardrobeScreenEvent()
@@ -102,40 +106,48 @@ class WardrobeViewModel @Inject constructor(
 
     fun onEvent(event: WardrobeScreenEvent) {
         when (event) {
-            is WardrobeScreenEvent.ImportJson -> {
+            is WardrobeScreenEvent.ImportBackup -> {
                 viewModelScope.launch {
-                    try {
-                        val jsonContent = withContext(Dispatchers.IO) {
-                            event.context.contentResolver.openInputStream(event.uri)?.use { input ->
-                                input.bufferedReader().readText()
+                    importer.importBackup(event.context, event.uri, event.mode)
+                        .onSuccess { outcome ->
+                            val message = if (outcome.legacyWithoutPhotos) {
+                                appContext.getString(R.string.success_import_legacy)
+                            } else {
+                                appContext.getString(R.string.success_import)
+                            }
+                            _uiState.update { it.copy(snackbarMessage = message) }
+                        }
+                        .onFailure { error ->
+                            val detail = when ((error as? BackupFormatException)?.kind) {
+                                BackupFormatException.Kind.CORRUPT ->
+                                    appContext.getString(R.string.error_backup_corrupt)
+                                BackupFormatException.Kind.UNSUPPORTED ->
+                                    appContext.getString(R.string.error_backup_unsupported)
+                                null -> error.message ?: appContext.getString(R.string.error_unknown)
+                            }
+                            _uiState.update {
+                                it.copy(snackbarMessage = appContext.getString(R.string.error_import_failed, detail))
                             }
                         }
-                        if (jsonContent.isNullOrBlank()) {
-                            _uiState.update { it.copy(errorMessage = appContext.getString(R.string.error_could_not_read_file)) }
-                            return@launch
-                        }
-                        importer.importFromJson(jsonContent)
-                            .onSuccess { message ->
-                                _uiState.update { it.copy(snackbarMessage = message) }
-                            }
-                            .onFailure { e ->
-                            _uiState.update { it.copy(errorMessage = appContext.getString(R.string.error_import_failed, e.message ?: "")) }
-                        }
-                    } catch (e: Exception) {
-                        _uiState.update { it.copy(errorMessage = appContext.getString(R.string.error_import_failed, e.message ?: "")) }
-                    }
                 }
             }
 
-            is WardrobeScreenEvent.ExportJson -> {
+            is WardrobeScreenEvent.ExportBackup -> {
                 viewModelScope.launch {
-                    val result =
-                        exporter.exportToJson(event.context.applicationContext, event.uri)
-                    result.onSuccess { message ->
-                        _uiState.update { it.copy(snackbarMessage = message) }
-                    }.onFailure { e ->
-                        _uiState.update { it.copy(errorMessage = appContext.getString(R.string.error_export_failed, e.message ?: "")) }
-                    }
+                    exporter.exportBackup(event.context.applicationContext, event.uri)
+                        .onSuccess { message ->
+                            _uiState.update { it.copy(snackbarMessage = message) }
+                        }
+                        .onFailure { error ->
+                            _uiState.update {
+                                it.copy(
+                                    snackbarMessage = appContext.getString(
+                                        R.string.error_export_failed,
+                                        error.message ?: appContext.getString(R.string.error_unknown),
+                                    )
+                                )
+                            }
+                        }
                 }
             }
 
