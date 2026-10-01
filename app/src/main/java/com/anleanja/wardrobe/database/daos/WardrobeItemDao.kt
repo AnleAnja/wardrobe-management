@@ -1,5 +1,6 @@
 package com.anleanja.wardrobe.database.daos
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -31,4 +32,12 @@ interface WardrobeItemDao {
 
     @Query("SELECT image_uri FROM wardrobe_items")
     suspend fun imageUris(): List<String>
+
+    @Query("SELECT id, image_uri FROM wardrobe_items")
+    suspend fun imageUrisById(): List<WardrobeItemImage>
 }
+
+data class WardrobeItemImage(
+    val id: Int,
+    @ColumnInfo(name = "image_uri") val imageUri: String?,
+)

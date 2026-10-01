@@ -1,4 +1,5 @@
 package com.anleanja.wardrobe.database.daos
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -42,4 +43,13 @@ interface OutfitDao {
 
     @Query("SELECT image_uri_combined FROM outfits")
     suspend fun combinedUris(): List<String>
+
+    @Query("SELECT id, image_uri_teaser, image_uri_combined FROM outfits")
+    suspend fun imageUrisById(): List<OutfitImages>
 }
+
+data class OutfitImages(
+    val id: Int,
+    @ColumnInfo(name = "image_uri_teaser") val imageUriTeaser: String?,
+    @ColumnInfo(name = "image_uri_combined") val imageUriCombined: String?,
+)

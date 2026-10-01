@@ -91,6 +91,11 @@ class WardrobeImporter @Inject constructor(
             WardrobeBackup.resolveImportedImage(uri, savedByFileName)
         }
         database.withTransaction {
+            val toWrite = if (mode == ImportMode.MERGE) {
+                preserveLocalImages(rewritten)
+            } else {
+                rewritten
+            }
             if (mode == ImportMode.REPLACE) {
                 database.scheduledItemDao().deleteAll()
                 database.outfitItemDao().deleteAll()
@@ -98,19 +103,19 @@ class WardrobeImporter @Inject constructor(
                 database.outfitDao().deleteAll()
                 database.wardrobeItemDao().deleteAll()
             }
-            rewritten.wardrobeItems.forEach { item ->
+            toWrite.wardrobeItems.forEach { item ->
                 database.wardrobeItemDao().insertItem(item.toEntity())
             }
-            rewritten.outfits.forEach { outfit ->
+            toWrite.outfits.forEach { outfit ->
                 database.outfitDao().insertOutfit(outfit.toEntity())
             }
-            rewritten.outfitItems.forEach { outfitItem ->
+            toWrite.outfitItems.forEach { outfitItem ->
                 database.outfitItemDao().insertItem(outfitItem.toEntity())
             }
-            rewritten.scheduledOutfits.forEach { scheduled ->
+            toWrite.scheduledOutfits.forEach { scheduled ->
                 database.scheduledOutfitDao().insertOutfit(scheduled.toEntity())
             }
-            rewritten.scheduledItems.orEmpty().forEach { scheduledItem ->
+            toWrite.scheduledItems.orEmpty().forEach { scheduledItem ->
                 database.scheduledItemDao().insertItem(scheduledItem.toEntity())
             }
         }
@@ -118,11 +123,55 @@ class WardrobeImporter @Inject constructor(
         return Result.success(ImportSuccess(legacyWithoutPhotos = WardrobeBackup.isLegacy(data)))
     }
 
+    private suspend fun preserveLocalImages(data: WardrobeImport): WardrobeImport {
+        val itemImages = database.wardrobeItemDao().imageUrisById()
+            .associate { it.id to it.imageUri }
+        val outfitImages = database.outfitDao().imageUrisById()
+            .associateBy { it.id }
+        return data.copy(
+            wardrobeItems = data.wardrobeItems.map { item ->
+                item.copy(
+                    imageUri = mergeImageUri(
+                        existing = itemImages[item.id],
+                        imported = item.imageUri,
+                        importedIsLocal = imageStorage.isLocalImage(item.imageUri),
+                    )
+                )
+            },
+            outfits = data.outfits.map { outfit ->
+                val existing = outfitImages[outfit.id]
+                outfit.copy(
+                    imageUriCombined = mergeImageUri(
+                        existing = existing?.imageUriCombined,
+                        imported = outfit.imageUriCombined,
+                        importedIsLocal = imageStorage.isLocalImage(outfit.imageUriCombined),
+                    ),
+                    imageUriTeaser = mergeImageUri(
+                        existing = existing?.imageUriTeaser,
+                        imported = outfit.imageUriTeaser,
+                        importedIsLocal = imageStorage.isLocalImage(outfit.imageUriTeaser),
+                    ),
+                )
+            },
+        )
+    }
+
     private suspend fun referencedImageUris(): Set<String> = buildSet {
         database.wardrobeItemDao().imageUris().filterTo(this) { it.isNotEmpty() }
         database.outfitDao().teaserUris().filterTo(this) { it.isNotEmpty() }
         database.outfitDao().combinedUris().filterTo(this) { it.isNotEmpty() }
     }
+}
+
+/**
+ * Keeps the photo already on this device when a merge backup did not install a replacement
+ * file. A live file under the app image directory wins; otherwise a non-blank existing URI
+ * (including a legacy content URI) is left in place. Unusable backup paths are dropped.
+ */
+internal fun mergeImageUri(existing: String?, imported: String?, importedIsLocal: Boolean): String? {
+    if (importedIsLocal) return imported
+    if (!existing.isNullOrBlank()) return existing
+    return null
 }
 
 private fun WardrobeItemJson.toEntity() = WardrobeItem(
