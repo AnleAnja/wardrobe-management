@@ -15,13 +15,14 @@
     <string name="title_outfit_details">Outfit Details</string>
 
     <!-- Top bar actions -->
-    <string name="action_import_json">Import JSON</string>
-    <string name="action_export_json">Export JSON</string>
+    <string name="action_import_json">Import backup</string>
+    <string name="action_export_json">Export backup</string>
     <string name="action_add">Add</string>
 
     <!-- Errors -->
     <string name="error_load_items">Failed to load items: %1$s</string>
     <string name="error_could_not_read_file">Could not read file</string>
+    <string name="error_could_not_write_file">Could not write file</string>
     <string name="error_import_failed">Import failed: %1$s</string>
     <string name="error_export_failed">Export failed: %1$s</string>
     <string name="error_could_not_save_image">Could not save image</string>
@@ -32,6 +33,8 @@
     <string name="error_item_not_found">Item not found</string>
     <string name="error_something_went_wrong">Something went wrong</string>
     <string name="error_unknown">An unknown error occurred.</string>
+    <string name="error_backup_corrupt">This file is not a valid wardrobe backup.</string>
+    <string name="error_backup_unsupported">This backup was created by a newer version of Wardrobe.</string>
 
     <!-- Gallery empty states -->
     <string name="empty_no_wardrobe_items">No wardrobe items</string>
@@ -52,8 +55,19 @@
 
     <!-- Import / export feedback -->
     <string name="success_import">Successfully imported wardrobe data.</string>
+    <string name="success_import_legacy">Imported wardrobe details. This older backup did not include photos.</string>
     <string name="success_export">Successfully exported %1$d items.</string>
     <string name="upload_outfit_photo">Upload a photo</string>
     <string name="outfit_image_or_canvas_hint">Arrange items on the canvas, or upload your own photo.</string>
     <string name="remove_outfit_image">Remove image</string>
+
+    <!-- Backup import -->
+    <string name="import_backup_title">Import backup</string>
+    <string name="import_backup_message">Merge updates records that share an id and keeps everything else. Replace all deletes the current wardrobe, including photos, then imports the backup. Older JSON backups restore details only.</string>
+    <string name="import_merge">Merge</string>
+    <string name="import_replace_all">Replace all</string>
+    <string name="import_cancel">Cancel</string>
+    <string name="import_replace_title">Replace wardrobe?</string>
+    <string name="import_replace_message">This deletes your current items, outfits, calendar entries, and photos. You cannot undo it.</string>
+    <string name="import_replace_confirm">Replace</string>
 </resources>

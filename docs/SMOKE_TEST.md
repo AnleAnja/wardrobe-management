@@ -53,12 +53,11 @@ Test the **signed release APK** (`assembleRelease`), not a debug build.
 
 ---
 
-## Backup (JSON)
+## Backup
 
-- [ ] Export JSON to a file
-- [ ] Import the same JSON (or a test backup)
-- [ ] Wardrobe/outfit **metadata** is restored
-- [ ] Note: photos may be missing after import if paths pointed to another install — known limitation in v1.0.0
+- [ ] Export a ZIP and confirm it contains `wardrobe.json` and photos
+- [ ] Import that ZIP with Merge, then again with Replace all (confirm the second dialog)
+- [ ] Import an older JSON backup and confirm details restore, with a message that photos were not included
 
 ---
 

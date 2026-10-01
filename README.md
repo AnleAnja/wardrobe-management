@@ -14,8 +14,14 @@ Catalog your closet, build outfits, and plan what to wear. Free Android app — 
 
 - Wardrobe catalog with photos, categories, seasons, and wear tracking
 - Outfit builder and calendar planning
-- JSON import/export backup
+- ZIP backup import/export, including photos
 - Optional inspiration tab (web content)
+
+## Photos and backups
+
+New photos are stored on the device as JPEG. The long edge is limited to 1600 pixels at quality 85, so a typical item photo is a few hundred kilobytes.
+
+Export writes a `.zip` backup with `wardrobe.json` and an `images/` folder. Import can merge that backup into the current wardrobe or replace the wardrobe, including photos. JSON backups from older versions still import item, outfit, and calendar details. Those files do not contain the photo files.
 
 ## Privacy
 

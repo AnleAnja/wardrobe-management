@@ -27,6 +27,9 @@ interface ScheduledItemDao {
     @Query("DELETE FROM scheduled_items WHERE scheduled_outfit_id = :scheduledOutfitId")
     suspend fun deleteItem(scheduledOutfitId: Int)
 
+    @Query("DELETE FROM scheduled_items")
+    suspend fun deleteAll()
+
     @Transaction
     suspend fun replaceAllForScheduledOutfit(scheduledOutfitId: Int, newItemIds: List<Int>) {
         deleteItem(scheduledOutfitId)
