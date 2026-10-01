@@ -21,8 +21,9 @@ import javax.inject.Singleton
  * Stores wardrobe photos in the app's internal filesDir so they survive in-place app
  * updates and don't depend on persistable content:// URI permissions.
  *
- * New photos are resized to a [MAX_IMAGE_EDGE_PX] long edge and saved as JPEG at
- * [JPEG_QUALITY]. Stored as `file://` URIs because that's what Coil and the existing UI expect.
+ * New photos are resized to a [MAX_IMAGE_EDGE_PX] long edge. Opaque photos are saved as JPEG
+ * at [JPEG_QUALITY]; photos with transparency stay PNG so cut-outs still layer on the outfit
+ * canvas. Stored as `file://` URIs because that's what Coil and the existing UI expect.
  * Legacy `content://` URIs in the DB keep working alongside these.
  */
 @Singleton
@@ -33,46 +34,58 @@ class ImageStorage @Inject constructor(
         File(context.filesDir, IMAGE_DIR).also { if (!it.exists()) it.mkdirs() }
     }
 
-    /** Decode, downscale, and store [source] as a JPEG. Returns a `file://` URI string. */
+    /** Decode, downscale, and store [source]. Returns a `file://` URI string. */
     suspend fun saveImage(source: Uri): String? = withContext(Dispatchers.IO) {
-        val temp = File.createTempFile("wardrobe-src", ".img", context.cacheDir)
+        var temp: File? = null
         try {
+            val sourceFile = File.createTempFile("wardrobe-src", ".img", context.cacheDir)
+            temp = sourceFile
             context.contentResolver.openInputStream(source)?.use { input ->
-                temp.outputStream().use { output -> input.copyTo(output) }
+                sourceFile.outputStream().use { output -> input.copyTo(output) }
             } ?: return@withContext null
-            val decoded = decodeSampled(temp) ?: return@withContext null
+            val decoded = decodeSampled(sourceFile) ?: return@withContext null
             try {
-                writeJpeg(decoded)
+                writeEncoded(decoded, keepAlpha = hasTransparentPixels(decoded))
             } finally {
                 if (!decoded.isRecycled) decoded.recycle()
             }
         } catch (e: Exception) {
             null
         } finally {
-            temp.delete()
+            temp?.delete()
         }
     }
 
     /** Encode a bitmap (for example a rendered outfit canvas) as a JPEG in filesDir. */
     suspend fun saveBitmap(bitmap: Bitmap): String? = withContext(Dispatchers.IO) {
         try {
-            writeJpeg(bitmap)
+            writeEncoded(bitmap, keepAlpha = false)
         } catch (e: Exception) {
             null
         }
     }
 
-    /** Store already-encoded backup bytes without resizing them again. */
-    fun saveBytes(bytes: ByteArray, extension: String): String? {
-        val ext = extension.lowercase().removePrefix(".")
-        if (ext !in ALLOWED_EXTENSIONS || bytes.isEmpty()) return null
-        return try {
-            val out = File(baseDir, "${UUID.randomUUID()}.$ext")
-            out.writeBytes(bytes)
-            Uri.fromFile(out).toString()
-        } catch (e: Exception) {
-            null
+    /**
+     * Moves an already-encoded backup photo into the images dir without re-encoding it.
+     * Returns null when [source] is not a recognised image (see [imageExtensionFor]);
+     * I/O failures throw and leave nothing behind.
+     */
+    fun saveImportedImage(source: File): String? {
+        val header = source.inputStream().use { input ->
+            val buffer = ByteArray(IMAGE_HEADER_BYTES)
+            buffer.copyOf(input.read(buffer).coerceAtLeast(0))
         }
+        val extension = imageExtensionFor(header) ?: return null
+        val out = File(baseDir, "${UUID.randomUUID()}.$extension")
+        if (!source.renameTo(out)) {
+            try {
+                source.copyTo(out)
+            } catch (e: Exception) {
+                out.delete()
+                throw e
+            }
+        }
+        return Uri.fromFile(out).toString()
     }
 
     /** Delete a previously-saved local image. No-op for anything outside our images dir. */
@@ -85,15 +98,8 @@ class ImageStorage @Inject constructor(
         }
     }
 
-    /** Deletes files in the images dir that are not in [referenced]. */
-    fun deleteUnreferenced(referenced: Set<String>) {
-        val keep = referenced.mapNotNull { uri -> localImageFile(uri)?.canonicalPath }.toSet()
-        baseDir.listFiles().orEmpty().forEach { file ->
-            if (file.isFile && file.canonicalPath !in keep) {
-                file.delete()
-            }
-        }
-    }
+    /** Free bytes on the volume that holds the images dir. */
+    fun availableBytes(): Long = baseDir.usableSpace
 
     fun isLocalImage(uriOrPath: String?): Boolean = localImageFile(uriOrPath) != null
 
@@ -110,12 +116,17 @@ class ImageStorage @Inject constructor(
         }
     }
 
-    private fun writeJpeg(bitmap: Bitmap): String? {
-        val out = File(baseDir, "${UUID.randomUUID()}.jpg")
-        val encoded = bitmapForJpeg(bitmap)
+    private fun writeEncoded(bitmap: Bitmap, keepAlpha: Boolean): String? {
+        val extension = if (keepAlpha) "png" else "jpg"
+        val out = File(baseDir, "${UUID.randomUUID()}.$extension")
+        val encoded = bitmapForEncoding(bitmap, fillTransparency = !keepAlpha)
         return try {
             val wrote = out.outputStream().use { stream ->
-                encoded.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, stream)
+                if (keepAlpha) {
+                    encoded.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                } else {
+                    encoded.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, stream)
+                }
             }
             if (!wrote) {
                 out.delete()
@@ -129,6 +140,17 @@ class ImageStorage @Inject constructor(
         } finally {
             if (encoded != bitmap && !encoded.isRecycled) encoded.recycle()
         }
+    }
+
+    /** [Bitmap.hasAlpha] is true for most decoded PNGs even when every pixel is opaque. */
+    private fun hasTransparentPixels(bitmap: Bitmap): Boolean {
+        if (!bitmap.hasAlpha()) return false
+        val row = IntArray(bitmap.width)
+        for (y in 0 until bitmap.height) {
+            bitmap.getPixels(row, 0, bitmap.width, 0, y, bitmap.width, 1)
+            if (row.any { Color.alpha(it) != 0xFF }) return true
+        }
+        return false
     }
 
     private fun decodeSampled(file: File): Bitmap? {
@@ -171,10 +193,10 @@ class ImageStorage @Inject constructor(
     }
 
     /**
-     * JPEG has no alpha. Canvas snapshots are drawn on white so transparent pixels
-     * don't turn black when the PNG is replaced.
+     * JPEG has no alpha, so when [fillTransparency] is set transparent pixels are drawn
+     * on white instead of turning black.
      */
-    private fun bitmapForJpeg(source: Bitmap): Bitmap {
+    private fun bitmapForEncoding(source: Bitmap, fillTransparency: Boolean): Bitmap {
         var current = if (source.config == Bitmap.Config.HARDWARE) {
             source.copy(Bitmap.Config.ARGB_8888, false) ?: return source
         } else {
@@ -186,7 +208,7 @@ class ImageStorage @Inject constructor(
             if (current != source) current.recycle()
             current = scaled
         }
-        if (current.hasAlpha()) {
+        if (fillTransparency && current.hasAlpha()) {
             val opaque = Bitmap.createBitmap(current.width, current.height, Bitmap.Config.ARGB_8888)
             Canvas(opaque).apply {
                 drawColor(Color.WHITE)
@@ -205,6 +227,5 @@ class ImageStorage @Inject constructor(
 
     companion object {
         private const val IMAGE_DIR = "wardrobe_images"
-        private val ALLOWED_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
     }
 }

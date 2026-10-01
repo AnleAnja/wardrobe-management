@@ -2,6 +2,7 @@ package com.anleanja.wardrobe.json_parser
 
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
 import com.anleanja.wardrobe.R
 import com.anleanja.wardrobe.database.AppDatabase
 import com.anleanja.wardrobe.database.entities.Outfit
@@ -10,7 +11,10 @@ import com.anleanja.wardrobe.database.entities.ScheduledItem
 import com.anleanja.wardrobe.database.entities.ScheduledOutfit
 import com.anleanja.wardrobe.database.entities.WardrobeItem
 import com.anleanja.wardrobe.storage.ImageStorage
+import com.anleanja.wardrobe.storage.InstallationId
 import com.google.gson.GsonBuilder
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -19,12 +23,15 @@ import java.util.zip.ZipEntry
 import javax.inject.Inject
 
 class WardrobeExporter @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val database: AppDatabase,
     private val imageStorage: ImageStorage,
+    private val installationId: InstallationId,
 ) {
     private val gson = GsonBuilder().setPrettyPrinting().create()
 
-    suspend fun exportBackup(context: Context, uri: Uri): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun exportBackup(uri: Uri): Result<String> = withContext(Dispatchers.IO) {
+        var opened = false
         try {
             val wardrobeItems = database.wardrobeItemDao().getAll().first()
             val outfits = database.outfitDao().getAll().first()
@@ -51,6 +58,7 @@ class WardrobeExporter @Inject constructor(
                 scheduledItems = scheduledItems.map { it.toJson() },
                 exportVersion = WardrobeBackup.CURRENT_VERSION,
                 exportedAt = Instant.now().toString(),
+                sourceId = installationId.value,
             )
 
             val output = context.contentResolver.openOutputStream(uri)
@@ -59,6 +67,7 @@ class WardrobeExporter @Inject constructor(
                     IllegalStateException(context.getString(R.string.error_could_not_write_file))
                 )
             }
+            opened = true
             output.use { stream ->
                 WardrobeBackup.writeZip(stream, gson.toJson(exportData)) { zip ->
                     bundled.forEach { (sourceUri, entryName) ->
@@ -71,9 +80,17 @@ class WardrobeExporter @Inject constructor(
             }
 
             Result.success(context.getString(R.string.success_export, wardrobeItems.size))
+        } catch (e: CancellationException) {
+            if (opened) deletePartialFile(uri)
+            throw e
         } catch (e: Exception) {
+            if (opened) deletePartialFile(uri)
             Result.failure(e)
         }
+    }
+
+    private fun deletePartialFile(uri: Uri) {
+        runCatching { DocumentsContract.deleteDocument(context.contentResolver, uri) }
     }
 }
 

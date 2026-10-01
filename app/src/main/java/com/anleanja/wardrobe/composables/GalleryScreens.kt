@@ -43,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,9 +75,8 @@ fun GalleryTopAppBar(
     onAddClick: () -> Unit,
     onAboutClick: (() -> Unit)? = null
 ) {
-    val context = LocalContext.current
-    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
-    var confirmReplace by remember { mutableStateOf(false) }
+    var pendingImportUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var confirmReplace by rememberSaveable { mutableStateOf(false) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -92,7 +92,7 @@ fun GalleryTopAppBar(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri: Uri? ->
         uri?.let {
-            viewModel.onEvent(WardrobeScreenEvent.ExportBackup(context, it))
+            viewModel.onEvent(WardrobeScreenEvent.ExportBackup(it))
         }
     }
 
@@ -108,7 +108,7 @@ fun GalleryTopAppBar(
                             confirmReplace = false
                             pendingImportUri = null
                             viewModel.onEvent(
-                                WardrobeScreenEvent.ImportBackup(context, uri, ImportMode.REPLACE)
+                                WardrobeScreenEvent.ImportBackup(uri, ImportMode.REPLACE)
                             )
                         }
                     ) {
@@ -132,7 +132,7 @@ fun GalleryTopAppBar(
                             onClick = {
                                 pendingImportUri = null
                                 viewModel.onEvent(
-                                    WardrobeScreenEvent.ImportBackup(context, uri, ImportMode.MERGE)
+                                    WardrobeScreenEvent.ImportBackup(uri, ImportMode.MERGE)
                                 )
                             }
                         ) {

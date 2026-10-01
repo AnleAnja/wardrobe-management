@@ -7,6 +7,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import com.anleanja.wardrobe.database.entities.WardrobeItem
 import kotlinx.coroutines.flow.Flow
 
@@ -30,8 +31,15 @@ interface WardrobeItemDao {
     @Query("DELETE FROM wardrobe_items")
     suspend fun deleteAll()
 
-    @Query("SELECT image_uri FROM wardrobe_items")
-    suspend fun imageUris(): List<String>
+    /** Updates in place on id conflict, so child rows are not cascade-deleted like REPLACE would. */
+    @Upsert
+    suspend fun upsertItem(item: WardrobeItem)
+
+    @Query("SELECT COALESCE(MAX(id), 0) FROM wardrobe_items")
+    suspend fun maxId(): Int
+
+    @Query("SELECT id FROM wardrobe_items")
+    suspend fun ids(): List<Int>
 
     @Query("SELECT id, image_uri FROM wardrobe_items")
     suspend fun imageUrisById(): List<WardrobeItemImage>

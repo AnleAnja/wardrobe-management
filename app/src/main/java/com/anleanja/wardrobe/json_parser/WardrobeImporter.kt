@@ -5,79 +5,85 @@ import android.net.Uri
 import androidx.room.withTransaction
 import com.anleanja.wardrobe.R
 import com.anleanja.wardrobe.database.AppDatabase
+import com.anleanja.wardrobe.database.entities.ImportedId
 import com.anleanja.wardrobe.database.entities.Outfit
 import com.anleanja.wardrobe.database.entities.OutfitItem
 import com.anleanja.wardrobe.database.entities.ScheduledItem
 import com.anleanja.wardrobe.database.entities.ScheduledOutfit
 import com.anleanja.wardrobe.database.entities.WardrobeItem
 import com.anleanja.wardrobe.storage.ImageStorage
+import com.anleanja.wardrobe.storage.InstallationId
 import com.google.gson.Gson
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.InputStream
 import java.util.UUID
 import javax.inject.Inject
 
 class WardrobeImporter @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val database: AppDatabase,
     private val imageStorage: ImageStorage,
+    private val installationId: InstallationId,
 ) {
     private val gson = Gson()
 
-    suspend fun importBackup(context: Context, uri: Uri, mode: ImportMode): Result<ImportSuccess> =
+    suspend fun importBackup(uri: Uri, mode: ImportMode): Result<ImportSuccess> =
         withContext(Dispatchers.IO) {
             try {
-                val input = context.contentResolver.openInputStream(uri)
-                    ?: return@withContext Result.failure(
-                        IllegalStateException(context.getString(R.string.error_could_not_read_file))
-                    )
+                // The picker's read grant can be gone if the import dialog outlived the process.
+                val input = try {
+                    context.contentResolver.openInputStream(uri)
+                } catch (e: SecurityException) {
+                    null
+                } catch (e: FileNotFoundException) {
+                    null
+                } ?: return@withContext Result.failure(
+                    IllegalStateException(context.getString(R.string.error_could_not_read_file))
+                )
                 input.buffered().use { buffered ->
-                    buffered.mark(4)
-                    val header = ByteArray(4)
-                    val read = buffered.read(header)
+                    buffered.mark(WardrobeBackup.HEADER_SIZE)
+                    val header = WardrobeBackup.readHeader(buffered)
                     buffered.reset()
-                    if (read == 4 && WardrobeBackup.isZip(header)) {
-                        importZip(context, buffered, mode)
+                    if (WardrobeBackup.isZip(header)) {
+                        importZip(buffered, mode)
                     } else {
-                        importParsed(WardrobeBackup.parse(buffered.reader().readText(), gson), emptyMap(), mode)
+                        val data = WardrobeBackup.parse(WardrobeBackup.readJson(buffered), gson)
+                        importParsed(data, savedByFileName = emptyMap(), installed = emptyList(), mode)
                     }
                 }
-            } catch (e: BackupFormatException) {
-                Result.failure(e)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Result.failure(e)
             }
         }
 
-    private suspend fun importZip(
-        context: Context,
-        input: InputStream,
-        mode: ImportMode,
-    ): Result<ImportSuccess> {
+    private suspend fun importZip(input: InputStream, mode: ImportMode): Result<ImportSuccess> {
         val temp = File(context.cacheDir, "wardrobe-import-${UUID.randomUUID()}").apply { mkdirs() }
-        return try {
-            val json = WardrobeBackup.readZip(input) { fileName, bytes ->
-                File(temp, fileName).writeBytes(bytes)
-            }
+        val installed = mutableListOf<String>()
+        var committed = false
+        try {
+            val limits = BackupLimits(
+                maxTotalBytes = (imageStorage.availableBytes() - STORAGE_RESERVE_BYTES).coerceAtLeast(0),
+            )
+            val json = WardrobeBackup.readZip(input, limits) { fileName -> File(temp, fileName).outputStream() }
             val data = WardrobeBackup.parse(json, gson)
             val savedByFileName = mutableMapOf<String, String>()
-            val copied = mutableListOf<String>()
-            var committed = false
-            try {
-                temp.listFiles().orEmpty().forEach { file ->
-                    val stored = imageStorage.saveBytes(file.readBytes(), WardrobeBackup.extensionOf(file.name))
-                        ?: throw BackupFormatException(BackupFormatException.Kind.CORRUPT)
-                    copied += stored
-                    savedByFileName[file.name] = stored
-                }
-                val result = importParsed(data, savedByFileName, mode)
-                committed = result.isSuccess
-                result
-            } finally {
-                if (!committed) copied.forEach { imageStorage.deleteImage(it) }
+            temp.listFiles().orEmpty().forEach { file ->
+                val stored = imageStorage.saveImportedImage(file) ?: return@forEach
+                installed += stored
+                savedByFileName[file.name] = stored
             }
+            val result = importParsed(data, savedByFileName, installed, mode)
+            committed = true
+            return result
         } finally {
+            if (!committed) installed.forEach { imageStorage.deleteImage(it) }
             temp.deleteRecursively()
         }
     }
@@ -85,45 +91,112 @@ class WardrobeImporter @Inject constructor(
     private suspend fun importParsed(
         data: WardrobeImport,
         savedByFileName: Map<String, String>,
+        installed: List<String>,
         mode: ImportMode,
     ): Result<ImportSuccess> {
-        val rewritten = data.withResolvedImages { uri ->
+        val resolved = data.withResolvedImages { uri ->
             WardrobeBackup.resolveImportedImage(uri, savedByFileName)
         }
-        database.withTransaction {
-            val toWrite = if (mode == ImportMode.MERGE) {
-                preserveLocalImages(rewritten)
-            } else {
-                rewritten
-            }
+        val foreignSource = data.sourceId?.takeUnless { WardrobeBackup.isFromSameSource(data, installationId.value) }
+        val trustContentUris = foreignSource == null
+        val obsoleteImages = database.withTransaction {
+            val referencedBefore = referencedLocalImages()
             if (mode == ImportMode.REPLACE) {
-                database.scheduledItemDao().deleteAll()
-                database.outfitItemDao().deleteAll()
-                database.scheduledOutfitDao().deleteAll()
-                database.outfitDao().deleteAll()
-                database.wardrobeItemDao().deleteAll()
+                deleteAllRows()
+                database.importedIdDao().deleteAll()
             }
-            toWrite.wardrobeItems.forEach { item ->
-                database.wardrobeItemDao().insertItem(item.toEntity())
+            val toWrite = when {
+                mode == ImportMode.REPLACE -> {
+                    if (foreignSource != null) recordMappings(foreignSource, identityMappings(resolved))
+                    keepUsableImages(resolved, trustContentUris)
+                }
+                foreignSource == null -> preserveLocalImages(resolved, trustContentUris)
+                else -> {
+                    val remap = WardrobeBackup.remapIds(resolved, knownMappings(foreignSource), nextFreeIds())
+                    recordMappings(foreignSource, remap.mappings)
+                    preserveLocalImages(remap.data, trustContentUris)
+                }
             }
-            toWrite.outfits.forEach { outfit ->
-                database.outfitDao().insertOutfit(outfit.toEntity())
-            }
-            toWrite.outfitItems.forEach { outfitItem ->
-                database.outfitItemDao().insertItem(outfitItem.toEntity())
-            }
-            toWrite.scheduledOutfits.forEach { scheduled ->
-                database.scheduledOutfitDao().insertOutfit(scheduled.toEntity())
-            }
-            toWrite.scheduledItems.orEmpty().forEach { scheduledItem ->
-                database.scheduledItemDao().insertItem(scheduledItem.toEntity())
-            }
+            writeRows(toWrite)
+            val installedPaths = installed.mapNotNull { imageStorage.localImageFile(it)?.canonicalPath }
+            (referencedBefore + installedPaths) - referencedLocalImages()
         }
-        runCatching { imageStorage.deleteUnreferenced(referencedImageUris()) }
+        obsoleteImages.forEach { imageStorage.deleteImage(it) }
         return Result.success(ImportSuccess(legacyWithoutPhotos = WardrobeBackup.isLegacy(data)))
     }
 
-    private suspend fun preserveLocalImages(data: WardrobeImport): WardrobeImport {
+    private suspend fun deleteAllRows() {
+        database.scheduledItemDao().deleteAll()
+        database.outfitItemDao().deleteAll()
+        database.scheduledOutfitDao().deleteAll()
+        database.outfitDao().deleteAll()
+        database.wardrobeItemDao().deleteAll()
+    }
+
+    private suspend fun writeRows(data: WardrobeImport) {
+        data.wardrobeItems.forEach { item ->
+            database.wardrobeItemDao().upsertItem(item.toEntity())
+        }
+        data.outfits.forEach { outfit ->
+            database.outfitDao().upsertOutfit(outfit.toEntity())
+        }
+        data.outfitItems.forEach { outfitItem ->
+            database.outfitItemDao().insertItem(outfitItem.toEntity())
+        }
+        data.scheduledOutfits.forEach { scheduled ->
+            database.scheduledOutfitDao().upsertOutfit(scheduled.toEntity())
+        }
+        data.scheduledItems.orEmpty().forEach { scheduledItem ->
+            database.scheduledItemDao().insertItem(scheduledItem.toEntity())
+        }
+    }
+
+    private suspend fun nextFreeIds() = NextIds(
+        items = database.wardrobeItemDao().maxId() + 1,
+        outfits = database.outfitDao().maxId() + 1,
+        scheduledOutfits = database.scheduledOutfitDao().maxId() + 1,
+    )
+
+    /** Earlier merges from [sourceId], ignoring rows that were deleted locally since. */
+    private suspend fun knownMappings(sourceId: String): IdMappings {
+        val rows = database.importedIdDao().forSource(sourceId)
+        fun mappingsFor(kind: String, existing: Set<Int>) = rows
+            .filter { it.kind == kind && it.localId in existing }
+            .associate { it.foreignId to it.localId }
+        return IdMappings(
+            items = mappingsFor(ImportedId.KIND_ITEM, database.wardrobeItemDao().ids().toSet()),
+            outfits = mappingsFor(ImportedId.KIND_OUTFIT, database.outfitDao().ids().toSet()),
+            scheduledOutfits = mappingsFor(
+                ImportedId.KIND_SCHEDULED_OUTFIT,
+                database.scheduledOutfitDao().ids().toSet(),
+            ),
+        )
+    }
+
+    private fun identityMappings(data: WardrobeImport) = IdMappings(
+        items = data.wardrobeItems.associate { it.id to it.id },
+        outfits = data.outfits.associate { it.id to it.id },
+        scheduledOutfits = data.scheduledOutfits.associate { it.id to it.id },
+    )
+
+    private suspend fun recordMappings(sourceId: String, mappings: IdMappings) {
+        fun rows(kind: String, ids: Map<Int, Int>) = ids.map { (foreignId, localId) ->
+            ImportedId(sourceId = sourceId, kind = kind, foreignId = foreignId, localId = localId)
+        }
+        database.importedIdDao().upsertAll(
+            rows(ImportedId.KIND_ITEM, mappings.items) +
+                rows(ImportedId.KIND_OUTFIT, mappings.outfits) +
+                rows(ImportedId.KIND_SCHEDULED_OUTFIT, mappings.scheduledOutfits)
+        )
+    }
+
+    private fun keepUsableImages(data: WardrobeImport, trustContentUris: Boolean): WardrobeImport {
+        return data.withResolvedImages { uri ->
+            importedImageUri(uri, imageStorage.isLocalImage(uri), trustContentUris)
+        }
+    }
+
+    private suspend fun preserveLocalImages(data: WardrobeImport, trustContentUris: Boolean): WardrobeImport {
         val itemImages = database.wardrobeItemDao().imageUrisById()
             .associate { it.id to it.imageUri }
         val outfitImages = database.outfitDao().imageUrisById()
@@ -135,6 +208,7 @@ class WardrobeImporter @Inject constructor(
                         existing = itemImages[item.id],
                         imported = item.imageUri,
                         importedIsLocal = imageStorage.isLocalImage(item.imageUri),
+                        trustContentUris = trustContentUris,
                     )
                 )
             },
@@ -145,33 +219,32 @@ class WardrobeImporter @Inject constructor(
                         existing = existing?.imageUriCombined,
                         imported = outfit.imageUriCombined,
                         importedIsLocal = imageStorage.isLocalImage(outfit.imageUriCombined),
+                        trustContentUris = trustContentUris,
                     ),
                     imageUriTeaser = mergeImageUri(
                         existing = existing?.imageUriTeaser,
                         imported = outfit.imageUriTeaser,
                         importedIsLocal = imageStorage.isLocalImage(outfit.imageUriTeaser),
+                        trustContentUris = trustContentUris,
                     ),
                 )
             },
         )
     }
 
-    private suspend fun referencedImageUris(): Set<String> = buildSet {
-        database.wardrobeItemDao().imageUris().filterTo(this) { it.isNotEmpty() }
-        database.outfitDao().teaserUris().filterTo(this) { it.isNotEmpty() }
-        database.outfitDao().combinedUris().filterTo(this) { it.isNotEmpty() }
+    private suspend fun referencedLocalImages(): Set<String> {
+        val items = database.wardrobeItemDao().imageUrisById().map { it.imageUri }
+        val outfits = database.outfitDao().imageUrisById()
+            .flatMap { listOf(it.imageUriTeaser, it.imageUriCombined) }
+        return (items + outfits)
+            .mapNotNull { uri -> imageStorage.localImageFile(uri)?.canonicalPath }
+            .toSet()
     }
-}
 
-/**
- * Keeps the photo already on this device when a merge backup did not install a replacement
- * file. A live file under the app image directory wins; otherwise a non-blank existing URI
- * (including a legacy content URI) is left in place. Unusable backup paths are dropped.
- */
-internal fun mergeImageUri(existing: String?, imported: String?, importedIsLocal: Boolean): String? {
-    if (importedIsLocal) return imported
-    if (!existing.isNullOrBlank()) return existing
-    return null
+    private companion object {
+        /** Left free so an import never fills the device. */
+        const val STORAGE_RESERVE_BYTES = 200L * 1024 * 1024
+    }
 }
 
 private fun WardrobeItemJson.toEntity() = WardrobeItem(

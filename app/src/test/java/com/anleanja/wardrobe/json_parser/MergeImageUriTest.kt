@@ -14,6 +14,7 @@ class MergeImageUriTest {
                 existing = "file:///wardrobe_images/old.jpg",
                 imported = "file:///wardrobe_images/new.jpg",
                 importedIsLocal = true,
+                trustContentUris = true,
             )
         )
     }
@@ -26,6 +27,7 @@ class MergeImageUriTest {
                 existing = "content://media/item",
                 imported = "file:///other-device/item.jpg",
                 importedIsLocal = false,
+                trustContentUris = false,
             )
         )
     }
@@ -38,6 +40,7 @@ class MergeImageUriTest {
                 existing = "file:///wardrobe_images/current.jpg",
                 imported = null,
                 importedIsLocal = false,
+                trustContentUris = true,
             )
         )
     }
@@ -50,8 +53,33 @@ class MergeImageUriTest {
                 existing = null,
                 imported = "file:///wardrobe_images/new.jpg",
                 importedIsLocal = true,
+                trustContentUris = false,
             )
         )
+    }
+
+    @Test
+    fun contentUriIsKeptOnlyForThisDevicesBackups() {
+        assertEquals(
+            "content://media/item",
+            mergeImageUri(existing = null, imported = "content://media/item", importedIsLocal = false, trustContentUris = true)
+        )
+        assertEquals(
+            "content://media/item",
+            importedImageUri(imported = "content://media/item", importedIsLocal = false, trustContentUris = true)
+        )
+        assertNull(
+            mergeImageUri(existing = null, imported = "content://media/item", importedIsLocal = false, trustContentUris = false)
+        )
+        assertNull(
+            importedImageUri(imported = "content://media/item", importedIsLocal = false, trustContentUris = false)
+        )
+    }
+
+    @Test
+    fun importedImageUriDropsPathsFromOtherDevices() {
+        assertNull(importedImageUri(imported = "file:///other-device/item.jpg", importedIsLocal = false, trustContentUris = true))
+        assertNull(importedImageUri(imported = null, importedIsLocal = false, trustContentUris = true))
     }
 
     @Test
@@ -61,6 +89,7 @@ class MergeImageUriTest {
                 existing = null,
                 imported = "file:///other-device/item.jpg",
                 importedIsLocal = false,
+                trustContentUris = true,
             )
         )
     }

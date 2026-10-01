@@ -9,6 +9,7 @@ data class WardrobeImport(
     val scheduledItems: List<ScheduledItemJson>? = null,
     val exportVersion: Int? = null,
     val exportedAt: String? = null,
+    val sourceId: String? = null,
 )
 
 data class WardrobeItemJson(

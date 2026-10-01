@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import com.anleanja.wardrobe.database.entities.ScheduledOutfit
 import kotlinx.coroutines.flow.Flow
 
@@ -27,6 +28,16 @@ interface ScheduledOutfitDao {
 
     @Query("DELETE FROM scheduled_outfits")
     suspend fun deleteAll()
+
+    /** Updates in place on id conflict, so child rows are not cascade-deleted like REPLACE would. */
+    @Upsert
+    suspend fun upsertOutfit(item: ScheduledOutfit)
+
+    @Query("SELECT COALESCE(MAX(id), 0) FROM scheduled_outfits")
+    suspend fun maxId(): Int
+
+    @Query("SELECT id FROM scheduled_outfits")
+    suspend fun ids(): List<Int>
 
     @Query("SELECT * FROM SCHEDULED_OUTFITS WHERE outfit_id = :outfitId")
     fun getAllForOutfit(outfitId: Int): Flow<List<ScheduledOutfit>>

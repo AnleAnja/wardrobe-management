@@ -42,12 +42,8 @@ data class WardrobeUiState(
 )
 
 sealed class WardrobeScreenEvent {
-    data class ImportBackup(
-        val context: Context,
-        val uri: Uri,
-        val mode: ImportMode,
-    ) : WardrobeScreenEvent()
-    data class ExportBackup(val context: Context, val uri: Uri) : WardrobeScreenEvent()
+    data class ImportBackup(val uri: Uri, val mode: ImportMode) : WardrobeScreenEvent()
+    data class ExportBackup(val uri: Uri) : WardrobeScreenEvent()
     data object AddItemClicked : WardrobeScreenEvent()
     data class ItemClicked(val item: WardrobeItem) : WardrobeScreenEvent()
     data object RefreshRequested : WardrobeScreenEvent()
@@ -108,7 +104,7 @@ class WardrobeViewModel @Inject constructor(
         when (event) {
             is WardrobeScreenEvent.ImportBackup -> {
                 viewModelScope.launch {
-                    importer.importBackup(event.context, event.uri, event.mode)
+                    importer.importBackup(event.uri, event.mode)
                         .onSuccess { outcome ->
                             val message = if (outcome.legacyWithoutPhotos) {
                                 appContext.getString(R.string.success_import_legacy)
@@ -123,6 +119,10 @@ class WardrobeViewModel @Inject constructor(
                                     appContext.getString(R.string.error_backup_corrupt)
                                 BackupFormatException.Kind.UNSUPPORTED ->
                                     appContext.getString(R.string.error_backup_unsupported)
+                                BackupFormatException.Kind.TOO_LARGE ->
+                                    appContext.getString(R.string.error_backup_too_large)
+                                BackupFormatException.Kind.NO_SPACE ->
+                                    appContext.getString(R.string.error_backup_no_space)
                                 null -> error.message ?: appContext.getString(R.string.error_unknown)
                             }
                             _uiState.update {
@@ -134,7 +134,7 @@ class WardrobeViewModel @Inject constructor(
 
             is WardrobeScreenEvent.ExportBackup -> {
                 viewModelScope.launch {
-                    exporter.exportBackup(event.context.applicationContext, event.uri)
+                    exporter.exportBackup(event.uri)
                         .onSuccess { message ->
                             _uiState.update { it.copy(snackbarMessage = message) }
                         }

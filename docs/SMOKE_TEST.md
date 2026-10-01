@@ -57,6 +57,9 @@ Test the **signed release APK** (`assembleRelease`), not a debug build.
 
 - [ ] Export a ZIP and confirm it contains `wardrobe.json` and photos
 - [ ] Import that ZIP with Merge, then again with Replace all (confirm the second dialog)
+- [ ] After a Merge, outfits still list their items and calendar entries are still there
+- [ ] Merge a ZIP exported on a second device: its items are added next to yours, nothing of yours changes
+- [ ] Merge that same second-device ZIP again: nothing is duplicated
 - [ ] Import an older JSON backup and confirm details restore, with a message that photos were not included
 
 ---

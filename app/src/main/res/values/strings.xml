@@ -35,6 +35,8 @@
     <string name="error_unknown">An unknown error occurred.</string>
     <string name="error_backup_corrupt">This file is not a valid wardrobe backup.</string>
     <string name="error_backup_unsupported">This backup was created by a newer version of Wardrobe.</string>
+    <string name="error_backup_too_large">This backup contains a file that is too large to import.</string>
+    <string name="error_backup_no_space">There isn\'t enough free storage on this device to import this backup.</string>
 
     <!-- Gallery empty states -->
     <string name="empty_no_wardrobe_items">No wardrobe items</string>
@@ -63,7 +65,7 @@
 
     <!-- Backup import -->
     <string name="import_backup_title">Import backup</string>
-    <string name="import_backup_message">Merge updates records that share an id and keeps everything else. Replace all deletes the current wardrobe, including photos, then imports the backup. Older JSON backups restore details only.</string>
+    <string name="import_backup_message">Merge keeps your current wardrobe. A backup made on this device updates the matching items, outfits, and calendar entries; a backup from another device is added alongside them, and merging it again updates those copies. Replace all deletes the current wardrobe, including photos, then imports the backup. Older JSON backups restore details only.</string>
     <string name="import_merge">Merge</string>
     <string name="import_replace_all">Replace all</string>
     <string name="import_cancel">Cancel</string>
