@@ -66,6 +66,32 @@ class ImageStorage @Inject constructor(
     }
 
     /**
+     * Decodes a stored photo (`file://` URI, plain path or legacy `content://` URI) upright and
+     * downsampled to roughly [maxEdge]. Returns null when it can't be read.
+     */
+    suspend fun decodeImage(uriOrPath: String, maxEdge: Int = MAX_IMAGE_EDGE_PX): Bitmap? =
+        withContext(Dispatchers.IO) {
+            var temp: File? = null
+            try {
+                val file = if (uriOrPath.startsWith("content://")) {
+                    File.createTempFile("wardrobe-decode", ".img", context.cacheDir).also { copy ->
+                        temp = copy
+                        context.contentResolver.openInputStream(uriOrPath.toUri())?.use { input ->
+                            copy.outputStream().use { output -> input.copyTo(output) }
+                        } ?: return@withContext null
+                    }
+                } else {
+                    localPath(uriOrPath)?.let(::File) ?: return@withContext null
+                }
+                decodeSampled(file, maxEdge)
+            } catch (e: Exception) {
+                null
+            } finally {
+                temp?.delete()
+            }
+        }
+
+    /**
      * Moves an already-encoded backup photo into the images dir without re-encoding it.
      * Returns null when [source] is not a recognised image (see [imageExtensionFor]);
      * I/O failures throw and leave nothing behind.
@@ -153,12 +179,12 @@ class ImageStorage @Inject constructor(
         return false
     }
 
-    private fun decodeSampled(file: File): Bitmap? {
+    private fun decodeSampled(file: File, maxEdge: Int = MAX_IMAGE_EDGE_PX): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
         val options = BitmapFactory.Options().apply {
-            inSampleSize = sampleSizeForMaxEdge(bounds.outWidth, bounds.outHeight, MAX_IMAGE_EDGE_PX)
+            inSampleSize = sampleSizeForMaxEdge(bounds.outWidth, bounds.outHeight, maxEdge)
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
         val decoded = BitmapFactory.decodeFile(file.absolutePath, options) ?: return null

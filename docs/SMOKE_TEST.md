@@ -39,7 +39,7 @@ Test the **signed release APK** (`assembleRelease`), not a debug build.
 ## Outfits
 
 - [ ] Add outfit with single photo (original aspect ratio)
-- [ ] Optional: arrange items in canvas editor and save
+- [ ] Optional: arrange items in canvas editor, rotate the device (layout is kept), and save; the outfit shows the arranged image right after the first save
 - [ ] Open outfit detail
 - [ ] Edit or delete outfit
 
