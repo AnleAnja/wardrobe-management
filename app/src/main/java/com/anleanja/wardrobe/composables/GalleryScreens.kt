@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -32,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -40,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
 import com.anleanja.wardrobe.R
+import com.anleanja.wardrobe.json_parser.ImportMode
 import com.anleanja.wardrobe.filter_sort.FilterDialog
 import com.anleanja.wardrobe.filter_sort.OutfitFilters
 import com.anleanja.wardrobe.filter_sort.OutfitSortOption
@@ -70,22 +75,78 @@ fun GalleryTopAppBar(
     onAddClick: () -> Unit,
     onAboutClick: (() -> Unit)? = null
 ) {
-    val context = LocalContext.current
+    var pendingImportUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var confirmReplace by rememberSaveable { mutableStateOf(false) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri: Uri? ->
-            uri?.let { fileUri ->
-                viewModel.onEvent(WardrobeScreenEvent.ImportJson(context, fileUri))
+            if (uri != null) {
+                pendingImportUri = uri
+                confirmReplace = false
             }
         }
     )
 
     val exportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
+        contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri: Uri? ->
         uri?.let {
-            viewModel.onEvent(WardrobeScreenEvent.ExportJson(context, it))
+            viewModel.onEvent(WardrobeScreenEvent.ExportBackup(it))
+        }
+    }
+
+    pendingImportUri?.let { uri ->
+        if (confirmReplace) {
+            AlertDialog(
+                onDismissRequest = { confirmReplace = false },
+                title = { Text(stringResource(R.string.import_replace_title)) },
+                text = { Text(stringResource(R.string.import_replace_message)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            confirmReplace = false
+                            pendingImportUri = null
+                            viewModel.onEvent(
+                                WardrobeScreenEvent.ImportBackup(uri, ImportMode.REPLACE)
+                            )
+                        }
+                    ) {
+                        Text(stringResource(R.string.import_replace_confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmReplace = false }) {
+                        Text(stringResource(R.string.import_cancel))
+                    }
+                }
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { pendingImportUri = null },
+                title = { Text(stringResource(R.string.import_backup_title)) },
+                text = { Text(stringResource(R.string.import_backup_message)) },
+                confirmButton = {
+                    Column(horizontalAlignment = Alignment.End) {
+                        TextButton(
+                            onClick = {
+                                pendingImportUri = null
+                                viewModel.onEvent(
+                                    WardrobeScreenEvent.ImportBackup(uri, ImportMode.MERGE)
+                                )
+                            }
+                        ) {
+                            Text(stringResource(R.string.import_merge))
+                        }
+                        TextButton(onClick = { confirmReplace = true }) {
+                            Text(stringResource(R.string.import_replace_all))
+                        }
+                        TextButton(onClick = { pendingImportUri = null }) {
+                            Text(stringResource(R.string.import_cancel))
+                        }
+                    }
+                }
+            )
         }
     }
 
@@ -94,7 +155,7 @@ fun GalleryTopAppBar(
         navigationIcon = {
             Row {
                 IconButton(onClick = {
-                    filePickerLauncher.launch("application/json")
+                    filePickerLauncher.launch("*/*")
                 }) {
                     Icon(
                         imageVector = Icons.Default.Upload,
@@ -102,7 +163,7 @@ fun GalleryTopAppBar(
                     )
                 }
                 IconButton(onClick = {
-                    exportLauncher.launch("wardrobe_export.json")
+                    exportLauncher.launch("wardrobe_export.zip")
                 }) {
                     Icon(
                         imageVector = Icons.Default.Download,

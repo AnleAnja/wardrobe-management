@@ -6,6 +6,12 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.anleanja.wardrobe.canvas.CanvasItem
+import com.anleanja.wardrobe.canvas.broughtToFront
+import com.anleanja.wardrobe.canvas.moved
+import com.anleanja.wardrobe.canvas.renderOutfitCanvas
+import com.anleanja.wardrobe.canvas.resized
+import com.anleanja.wardrobe.canvas.syncCanvasItems
 import com.anleanja.wardrobe.database.OutfitRepository
 import com.anleanja.wardrobe.database.WardrobeItemRepository
 import com.anleanja.wardrobe.database.entities.Outfit
@@ -17,6 +23,7 @@ import com.anleanja.wardrobe.filter_sort.groupWardrobeItemsByCategoryRecentlyWor
 import com.anleanja.wardrobe.storage.ImageStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +32,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import kotlin.collections.toMutableSet
 
@@ -40,7 +48,8 @@ data class AddOutfitUiState(
     val isLoading: Boolean = true,
     val isSuccess: Boolean = false,
     val errorMessage: String? = null,
-    val isScheduledOutfit: Boolean = false
+    val isScheduledOutfit: Boolean = false,
+    val canvasItems: List<CanvasItem> = emptyList(),
     )
 
 sealed class AddOutfitEvent {
@@ -49,7 +58,12 @@ sealed class AddOutfitEvent {
     data class ItemsChanged(val itemId: Int) : AddOutfitEvent()
     data class SeasonsChanged(val seasons: String) : AddOutfitEvent()
     data class RatingChanged(val rating: Int) : AddOutfitEvent()
-    data class SaveOutfit(val combinedImage: Bitmap? = null) : AddOutfitEvent()
+    /** [dx] and [dy] are fractions of the canvas width and height. */
+    data class CanvasItemMoved(val itemId: Int, val dx: Float, val dy: Float) : AddOutfitEvent()
+    /** [delta] is a fraction of the canvas width. */
+    data class CanvasItemResized(val itemId: Int, val delta: Float) : AddOutfitEvent()
+    data class CanvasItemBroughtToFront(val itemId: Int) : AddOutfitEvent()
+    data object SaveOutfit : AddOutfitEvent()
     data object ClearSuccess: AddOutfitEvent()
 }
 
@@ -157,7 +171,7 @@ class AddOutfitViewModel @Inject constructor(
                 }
                 .collect { items ->
                     val groupedItems = groupWardrobeItemsByCategoryRecentlyWorn(items)
-                    _uiState.update { it.copy(isLoading = false, itemsByCategory = groupedItems) }
+                    _uiState.update { it.copy(isLoading = false, itemsByCategory = groupedItems).withSyncedCanvas() }
                 }
         }
     }
@@ -175,8 +189,17 @@ class AddOutfitViewModel @Inject constructor(
                     } else {
                         newSelection.add(event.itemId)
                     }
-                    currentState.copy(selectedItemIds = newSelection)
+                    currentState.copy(selectedItemIds = newSelection).withSyncedCanvas()
                 }
+            }
+            is AddOutfitEvent.CanvasItemMoved -> {
+                _uiState.update { it.copy(canvasItems = it.canvasItems.moved(event.itemId, event.dx, event.dy)) }
+            }
+            is AddOutfitEvent.CanvasItemResized -> {
+                _uiState.update { it.copy(canvasItems = it.canvasItems.resized(event.itemId, event.delta)) }
+            }
+            is AddOutfitEvent.CanvasItemBroughtToFront -> {
+                _uiState.update { it.copy(canvasItems = it.canvasItems.broughtToFront(event.itemId)) }
             }
             is AddOutfitEvent.SeasonsChanged -> {
                 _uiState.update { it.copy(seasons = event.seasons) }
@@ -186,7 +209,7 @@ class AddOutfitViewModel @Inject constructor(
             }
             is AddOutfitEvent.SaveOutfit -> {
                 if (_uiState.value.selectedItemIds.isNotEmpty()) {
-                    saveOutfit(event.combinedImage)
+                    saveOutfit()
                 }
             }
             AddOutfitEvent.ClearSuccess -> {
@@ -228,7 +251,7 @@ class AddOutfitViewModel @Inject constructor(
         }
     }
 
-    private fun saveOutfit(combinedImage: Bitmap?) {
+    private fun saveOutfit() {
         val state = _uiState.value
         viewModelScope.launch {
             try {
@@ -241,8 +264,13 @@ class AddOutfitViewModel @Inject constructor(
 
                     outfitRepository.replaceScheduledItems(scheduledOutfitId, itemsToAdd.toList())
                 } else {
-                    val teaserUri = if (combinedImage != null) {
-                        val saved = imageStorage.saveBitmap(combinedImage)
+                    val canvasImage = if (state.imageUri == null) renderCanvas(state.canvasItems) else null
+                    val teaserUri = if (canvasImage != null) {
+                        val saved = try {
+                            imageStorage.saveBitmap(canvasImage)
+                        } finally {
+                            canvasImage.recycle()
+                        }
                         if (saved == null) {
                             _uiState.update {
                                 it.copy(
@@ -287,6 +315,15 @@ class AddOutfitViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private suspend fun renderCanvas(items: List<CanvasItem>): Bitmap? = withContext(Dispatchers.Default) {
+        renderOutfitCanvas(items, decode = { uri -> imageStorage.decodeImage(uri) })
+    }
+
+    private fun AddOutfitUiState.withSyncedCanvas(): AddOutfitUiState {
+        val selected = itemsByCategory.values.flatten().filter { it.id in selectedItemIds }
+        return copy(canvasItems = syncCanvasItems(canvasItems, selected))
     }
 
     override fun onCleared() {

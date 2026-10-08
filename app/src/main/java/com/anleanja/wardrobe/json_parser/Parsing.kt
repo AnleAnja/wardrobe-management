@@ -6,7 +6,10 @@ data class WardrobeImport(
     val outfitItems: List<OutfitItemJson>,
     val scheduledOutfits: List<ScheduledOutfitJson>,
     // Nullable so older exports (without this field) still import cleanly.
-    val scheduledItems: List<ScheduledItemJson>? = null
+    val scheduledItems: List<ScheduledItemJson>? = null,
+    val exportVersion: Int? = null,
+    val exportedAt: String? = null,
+    val sourceId: String? = null,
 )
 
 data class WardrobeItemJson(

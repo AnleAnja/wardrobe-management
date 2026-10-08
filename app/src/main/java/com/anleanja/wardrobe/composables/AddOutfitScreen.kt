@@ -42,14 +42,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -60,7 +57,6 @@ import com.anleanja.wardrobe.R
 import com.anleanja.wardrobe.view_models.AddOutfitEvent
 import com.anleanja.wardrobe.view_models.AddOutfitUiState
 import com.anleanja.wardrobe.view_models.AddOutfitViewModel
-import kotlinx.coroutines.launch
 
 @Composable
 fun AddOutfitScreen(
@@ -69,8 +65,6 @@ fun AddOutfitScreen(
 ) {
     val viewModel: AddOutfitViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsState()
-    val scope = rememberCoroutineScope()
-    val graphicsLayer = rememberGraphicsLayer()
 
     LaunchedEffect(uiState.isSuccess) {
         if (uiState.isSuccess) {
@@ -80,19 +74,10 @@ fun AddOutfitScreen(
     }
     Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.weight(1f)) {
-            AddOutfitForm(uiState, viewModel, isScheduledOutfit, graphicsLayer)
+            AddOutfitForm(uiState, viewModel, isScheduledOutfit)
         }
         Button(
-            onClick = {
-                if (uiState.imageUri == null && !isScheduledOutfit) {
-                    scope.launch {
-                        val bitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
-                        viewModel.onEvent(AddOutfitEvent.SaveOutfit(bitmap))
-                    }
-                } else {
-                    viewModel.onEvent(AddOutfitEvent.SaveOutfit())
-                }
-            },
+            onClick = { viewModel.onEvent(AddOutfitEvent.SaveOutfit) },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
@@ -116,7 +101,6 @@ private fun AddOutfitForm(
     uiState: AddOutfitUiState,
     viewModel: AddOutfitViewModel,
     isScheduledOutfit: Boolean,
-    graphicsLayer: androidx.compose.ui.graphics.layer.GraphicsLayer
 ) {
     var isSeasonsMenuExpanded by remember { mutableStateOf(false) }
 
@@ -132,10 +116,6 @@ private fun AddOutfitForm(
         uiState.seasons.split(", ").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
     }
 
-    val selectedItems = remember(uiState.itemsByCategory, uiState.selectedItemIds) {
-        uiState.itemsByCategory.values.flatten().filter { it.id in uiState.selectedItemIds }
-    }
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp),
@@ -147,8 +127,10 @@ private fun AddOutfitForm(
                 if (uiState.imageUri == null) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutfitCanvasEditor(
-                            items = selectedItems,
-                            graphicsLayer = graphicsLayer
+                            items = uiState.canvasItems,
+                            onMove = { id, dx, dy -> viewModel.onEvent(AddOutfitEvent.CanvasItemMoved(id, dx, dy)) },
+                            onResize = { id, delta -> viewModel.onEvent(AddOutfitEvent.CanvasItemResized(id, delta)) },
+                            onBringToFront = { id -> viewModel.onEvent(AddOutfitEvent.CanvasItemBroughtToFront(id)) },
                         )
                         Text(
                             text = stringResource(R.string.outfit_image_or_canvas_hint),

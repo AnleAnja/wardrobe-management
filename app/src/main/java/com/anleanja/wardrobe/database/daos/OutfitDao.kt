@@ -1,9 +1,11 @@
 package com.anleanja.wardrobe.database.daos
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import com.anleanja.wardrobe.database.entities.Outfit
 import kotlinx.coroutines.flow.Flow
 
@@ -33,4 +35,26 @@ interface OutfitDao {
 
     @Query("DELETE FROM OUTFITS WHERE id = :id")
     suspend fun deleteOutfit(id: Int)
+
+    @Query("DELETE FROM outfits")
+    suspend fun deleteAll()
+
+    /** Updates in place on id conflict, so child rows are not cascade-deleted like REPLACE would. */
+    @Upsert
+    suspend fun upsertOutfit(outfit: Outfit)
+
+    @Query("SELECT COALESCE(MAX(id), 0) FROM outfits")
+    suspend fun maxId(): Int
+
+    @Query("SELECT id FROM outfits")
+    suspend fun ids(): List<Int>
+
+    @Query("SELECT id, image_uri_teaser, image_uri_combined FROM outfits")
+    suspend fun imageUrisById(): List<OutfitImages>
 }
+
+data class OutfitImages(
+    val id: Int,
+    @ColumnInfo(name = "image_uri_teaser") val imageUriTeaser: String?,
+    @ColumnInfo(name = "image_uri_combined") val imageUriCombined: String?,
+)

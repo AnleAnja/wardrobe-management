@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,119 +17,73 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.layer.GraphicsLayer
-import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.anleanja.wardrobe.database.entities.WardrobeItem
+import com.anleanja.wardrobe.canvas.CANVAS_ASPECT_RATIO
+import com.anleanja.wardrobe.canvas.CanvasItem
+import com.anleanja.wardrobe.canvas.boxOn
+import com.anleanja.wardrobe.canvas.inDrawOrder
+import kotlin.math.roundToInt
 
-private const val BASE_SIZE_DP = 120f
-private const val MIN_SCALE = 0.3f
-private const val MAX_SCALE = 5f
-
-class CanvasItemState(
-    val itemId: Int,
-    val imageUri: String?,
-    offset: Offset = Offset.Zero,
-    scale: Float = 1f,
-    zIndex: Float = 0f,
-) {
-    var offset by mutableStateOf(offset)
-    var scale by mutableStateOf(scale)
-    var zIndex by mutableStateOf(zIndex)
-}
-
+/**
+ * Lets the user arrange [items] on a 3:4 canvas. The layout itself lives in the caller (the
+ * view model), so it survives rotation; gestures are reported as fractions of the canvas.
+ */
 @Composable
 fun OutfitCanvasEditor(
-    items: List<WardrobeItem>,
-    graphicsLayer: GraphicsLayer,
+    items: List<CanvasItem>,
+    onMove: (itemId: Int, dx: Float, dy: Float) -> Unit,
+    onResize: (itemId: Int, delta: Float) -> Unit,
+    onBringToFront: (itemId: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val canvasItems = remember { mutableStateListOf<CanvasItemState>() }
-    var nextZ by remember { mutableFloatStateOf(1f) }
-    var selectedId by remember { mutableStateOf<Int?>(null) }
-    val basePx = with(LocalDensity.current) { BASE_SIZE_DP.dp.toPx() }
-
+    var selectedId by rememberSaveable { mutableStateOf<Int?>(null) }
     LaunchedEffect(items) {
-        val selectedIds = items.map { it.id }.toSet()
-        canvasItems.removeAll { it.itemId !in selectedIds }
-        if (selectedId != null && selectedId !in selectedIds) selectedId = null
-        items.forEach { item ->
-            if (canvasItems.none { it.itemId == item.id }) {
-                canvasItems.add(
-                    CanvasItemState(
-                        itemId = item.id,
-                        imageUri = item.imageUri,
-                        zIndex = nextZ++,
-                    )
-                )
-            }
-        }
+        if (items.none { it.itemId == selectedId }) selectedId = null
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(3f / 4f)
+            .aspectRatio(CANVAS_ASPECT_RATIO)
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .pointerInput(Unit) {
                 detectTapGestures { selectedId = null }
             }
     ) {
-        // Recorded layer: only the item images end up in the saved bitmap.
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .drawWithContent {
-                    graphicsLayer.record { this@drawWithContent.drawContent() }
-                    drawLayer(graphicsLayer)
-                }
-        ) {
-            canvasItems.sortedBy { it.zIndex }.forEach { state ->
-                key(state.itemId) {
-                    AsyncImage(
-                        model = state.imageUri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .graphicsLayer {
-                                translationX = state.offset.x
-                                translationY = state.offset.y
-                            }
-                            .size((BASE_SIZE_DP * state.scale).dp)
-                    )
-                }
-            }
-        }
+        val canvasWidth = constraints.maxWidth.toFloat()
+        val canvasHeight = constraints.maxHeight.toFloat()
+        val currentWidth by rememberUpdatedState(canvasWidth)
+        val currentHeight by rememberUpdatedState(canvasHeight)
+        val currentOnMove by rememberUpdatedState(onMove)
+        val currentOnResize by rememberUpdatedState(onResize)
+        val currentOnBringToFront by rememberUpdatedState(onBringToFront)
 
-        // Overlay layer (not recorded): hit targets, selection border and resize handle.
-        canvasItems.sortedBy { it.zIndex }.forEach { state ->
-            key("overlay-${state.itemId}") {
-                val isSelected = state.itemId == selectedId
+        items.inDrawOrder().forEach { item ->
+            key(item.itemId) {
+                val box = item.boxOn(canvasWidth, canvasHeight)
+                val isSelected = item.itemId == selectedId
                 Box(
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .graphicsLayer {
-                            translationX = state.offset.x
-                            translationY = state.offset.y
+                        // Measured at its own size even when larger than the canvas, so the
+                        // preview matches the saved image.
+                        .layout { measurable, _ ->
+                            val edge = box.edge.roundToInt()
+                            val placeable = measurable.measure(Constraints.fixed(edge, edge))
+                            layout(0, 0) { placeable.place(box.left.roundToInt(), box.top.roundToInt()) }
                         }
-                        .size((BASE_SIZE_DP * state.scale).dp)
                         .then(
                             if (isSelected) {
                                 Modifier.border(2.dp, MaterialTheme.colorScheme.primary)
@@ -136,24 +91,30 @@ fun OutfitCanvasEditor(
                                 Modifier
                             }
                         )
-                        .pointerInput(state.itemId) {
+                        .pointerInput(item.itemId) {
                             detectTapGestures {
-                                selectedId = state.itemId
-                                state.zIndex = nextZ++
+                                selectedId = item.itemId
+                                currentOnBringToFront(item.itemId)
                             }
                         }
-                        .pointerInput(state.itemId) {
+                        .pointerInput(item.itemId) {
                             detectDragGestures(
                                 onDragStart = {
-                                    selectedId = state.itemId
-                                    state.zIndex = nextZ++
+                                    selectedId = item.itemId
+                                    currentOnBringToFront(item.itemId)
                                 }
                             ) { change, drag ->
                                 change.consume()
-                                state.offset += drag
+                                currentOnMove(item.itemId, drag.x / currentWidth, drag.y / currentHeight)
                             }
                         }
                 ) {
+                    AsyncImage(
+                        model = item.imageUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
+                    )
                     if (isSelected) {
                         Box(
                             modifier = Modifier
@@ -162,11 +123,10 @@ fun OutfitCanvasEditor(
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primary)
                                 .border(2.dp, MaterialTheme.colorScheme.onPrimary, CircleShape)
-                                .pointerInput(state.itemId) {
+                                .pointerInput(item.itemId) {
                                     detectDragGestures { change, drag ->
                                         change.consume()
-                                        val delta = (drag.x + drag.y) / 2f / basePx
-                                        state.scale = (state.scale + delta).coerceIn(MIN_SCALE, MAX_SCALE)
+                                        currentOnResize(item.itemId, (drag.x + drag.y) / 2f / currentWidth)
                                     }
                                 }
                         )

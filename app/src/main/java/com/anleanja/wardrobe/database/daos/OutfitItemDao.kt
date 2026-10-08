@@ -43,4 +43,7 @@ interface OutfitItemDao {
 
     @Query("DELETE FROM OUTFIT_ITEMS WHERE outfit_id = :outfitId and item_id = :itemId")
     suspend fun deleteItem(outfitId: Int, itemId: Int)
+
+    @Query("DELETE FROM outfit_items")
+    suspend fun deleteAll()
 }
